@@ -1,6 +1,6 @@
 # memeamp
 
-A simple Ethereum wallet connection website built with vanilla HTML, CSS, and JavaScript using ethers.js.
+A simple Ethereum wallet connection website built with TypeScript and Vite using ethers.js.
 
 ## Features
 
@@ -11,40 +11,53 @@ A simple Ethereum wallet connection website built with vanilla HTML, CSS, and Ja
 - 🔄 Automatic reconnection on page reload
 - 📱 Responsive design
 
-## Usage
-
-1. Open `index.html` in a web browser
-2. Click "Connect Wallet" button
-3. Approve the connection in your Web3 wallet (e.g., MetaMask)
-4. View your wallet address, network, and balance
-
 ## Requirements
 
+- Node.js (see `.nvmrc` for version)
 - A Web3-compatible browser wallet (e.g., MetaMask)
 - Modern web browser with JavaScript enabled
 
 ## Technology Stack
 
-- HTML5
-- CSS3
-- JavaScript (ES6+)
-- ethers.js v5.7.2 (loaded via CDN)
+- TypeScript
+- Vite
+- ethers.js v5.8.0
+- Modern CSS3
 
 ## Local Development
 
-Simply open the `index.html` file in your browser. No build process or server required.
-
-Alternatively, you can use a local server:
+Install dependencies:
 
 ```bash
-# Using Python 3
-python -m http.server 8000
-
-# Using Node.js (http-server)
-npx http-server
+npm install
 ```
 
-Then open http://localhost:8000 in your browser.
+Start the development server (runs on port 6529):
+
+```bash
+npm run dev
+```
+
+Then open http://localhost:6529 in your browser.
+
+## Build for Production
+
+```bash
+npm run build
+```
+
+Preview production build:
+
+```bash
+npm run preview
+```
+
+## Usage
+
+1. Start the development server
+2. Click "Connect Wallet" button
+3. Approve the connection in your Web3 wallet (e.g., MetaMask)
+4. View your wallet address, network, and balance
 
 ## License
 

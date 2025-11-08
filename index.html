@@ -1,52 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memeamp - Connect Your Wallet</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🎵 Memeamp</h1>
-            <p class="tagline">Connect Your Ethereum Wallet</p>
-        </header>
-
-        <main>
-            <div class="wallet-section">
-                <button id="connectButton" class="connect-btn">
-                    Connect Wallet
-                </button>
-                
-                <div id="walletInfo" class="wallet-info hidden">
-                    <div class="info-item">
-                        <span class="label">Connected Address:</span>
-                        <span id="walletAddress" class="address"></span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Network:</span>
-                        <span id="networkName" class="network"></span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Balance:</span>
-                        <span id="balance" class="balance"></span>
-                    </div>
-                    <button id="disconnectButton" class="disconnect-btn">
-                        Disconnect
-                    </button>
-                </div>
-
-                <div id="errorMessage" class="error-message hidden"></div>
-            </div>
-        </main>
-
-        <footer>
-            <p>Built with ethers.js</p>
-        </footer>
-    </div>
-
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
-    <script src="app.js"></script>
-</body>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>
