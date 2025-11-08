@@ -1,13 +1,14 @@
 # Copilot Instructions for memeamp
 
-This repository appears to be a Next.js/TypeScript project based on the configuration files.
+This is a pure frontend basic site built from a Vite template.
 
 ## Project Structure
 
-- This is a Next.js application with TypeScript support
+- This is a Vite-based frontend application with TypeScript support
+- TypeScript code is compiled down to HTML/CSS/JS
 - Dependencies are managed via npm or yarn
-- Build output goes to `.next/` and `out/` directories
-- Production builds go to `build/`
+- Build output goes to `dist/` directory
+- Development server runs via Vite
 
 ## Code Conventions
 
@@ -65,9 +66,9 @@ npm run build
 - Ensure all tests pass before requesting review
 
 ## Best Practices
-- Follow the Next.js best practices and conventions
+- Follow Vite best practices and conventions
 - Optimize for performance and accessibility
 - Write semantic HTML
-- Use React best practices (hooks, component composition, etc.)
+- Keep the frontend lightweight and fast
 - Handle errors gracefully
-- Add loading states for async operations
+- Use modern JavaScript/TypeScript features
