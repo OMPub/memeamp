@@ -1,46 +1,44 @@
 import './style.css'
 import { initWallet } from './wallet'
 import type { WalletElements } from './types'
+import skinImage from './assets/MEMEAMP-skin-with-art-area.png'
 
 // Create the app HTML structure
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div class="container">
-    <header>
-      <h1>🎵 Memeamp</h1>
-      <p class="tagline">Connect Your Ethereum Wallet</p>
-    </header>
-
-    <main>
-      <div class="wallet-section">
-        <button id="connectButton" class="connect-btn">
-          Connect Wallet
-        </button>
-        
-        <div id="walletInfo" class="wallet-info hidden">
-          <div class="info-item">
-            <span class="label">Connected Address:</span>
-            <span id="walletAddress" class="address"></span>
+  <div class="memeamp-player">
+    <!-- Background Skin -->
+    <div class="player-skin">
+      <img src="${skinImage}" alt="MEMEAMP Player" class="skin-image" />
+      
+      <!-- Visualizer Area (Main Art Display) -->
+      <div class="visualizer-area">
+        <div id="visualizerContent" class="visualizer-content">
+          <div class="connect-prompt">
+            <button id="connectButton" class="connect-btn">
+              Connect Wallet to Load Memes
+            </button>
           </div>
-          <div class="info-item">
-            <span class="label">Network:</span>
-            <span id="networkName" class="network"></span>
-          </div>
-          <div class="info-item">
-            <span class="label">Balance:</span>
-            <span id="balance" class="balance"></span>
-          </div>
-          <button id="disconnectButton" class="disconnect-btn">
-            Disconnect
-          </button>
         </div>
-
+      </div>
+      
+      <!-- Playlist Section (Top 10 Memes) -->
+      <div class="playlist-section">
+        <div id="playlistContent" class="playlist-content">
+          <div class="playlist-placeholder">
+            Connect wallet to load playlist...
+          </div>
+        </div>
+      </div>
+      
+      <!-- Player Controls Overlay -->
+      <div class="player-controls">
+        <!-- Invisible disconnect button overlay on top-right X -->
+        <button id="disconnectButton" class="skin-x-button" title="Disconnect Wallet"></button>
+        
+        <!-- Error Display -->
         <div id="errorMessage" class="error-message hidden"></div>
       </div>
-    </main>
-
-    <footer>
-      <p>Built with ethers.js</p>
-    </footer>
+    </div>
   </div>
 `
 
@@ -48,10 +46,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 const walletElements: WalletElements = {
   connectButton: document.getElementById('connectButton') as HTMLButtonElement,
   disconnectButton: document.getElementById('disconnectButton') as HTMLButtonElement,
-  walletInfo: document.getElementById('walletInfo') as HTMLElement,
-  walletAddress: document.getElementById('walletAddress') as HTMLElement,
-  networkName: document.getElementById('networkName') as HTMLElement,
-  balance: document.getElementById('balance') as HTMLElement,
+  walletInfo: document.createElement('div'), // Hidden element (not displayed in new UI)
+  walletAddress: document.createElement('div'), // Hidden element (not displayed in new UI)
+  networkName: document.createElement('div'), // Hidden element (not displayed in new UI)
+  balance: document.createElement('div'), // Hidden element (not displayed in new UI)
   errorMessage: document.getElementById('errorMessage') as HTMLElement,
 }
 

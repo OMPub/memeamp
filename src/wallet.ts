@@ -1,10 +1,15 @@
 import { ethers } from 'ethers';
 import type { WalletState, NetworkMap, WalletElements } from './types';
+import SixFiveTwoNineVotingSDK, { type VotingData } from './6529-sdk';
 
 // State management
 let provider: ethers.BrowserProvider | null = null;
 let signer: ethers.JsonRpcSigner | null = null;
 let userAddress: string | null = null;
+
+// 6529 SDK
+const sdk = new SixFiveTwoNineVotingSDK();
+let votingData: VotingData | null = null;
 
 // Network names mapping
 const networks: NetworkMap = {
@@ -102,6 +107,9 @@ async function connectWallet(): Promise<void> {
     elements.walletInfo.classList.remove('hidden');
 
     console.log('Wallet connected:', userAddress);
+
+    // Authenticate with 6529 and fetch voting data
+    await authenticateWith6529();
   } catch (error: any) {
     console.error('Error connecting wallet:', error);
     
@@ -120,12 +128,35 @@ function disconnectWallet(): void {
   provider = null;
   signer = null;
   userAddress = null;
+  votingData = null;
 
   // Reset UI
   elements.walletInfo.classList.add('hidden');
   elements.connectButton.classList.remove('hidden');
   resetConnectButton();
   hideError();
+  
+  // Clear playlist and visualizer
+  const playlistContent = document.getElementById('playlistContent');
+  if (playlistContent) {
+    playlistContent.innerHTML = '<div class="playlist-placeholder">Connect wallet to load playlist...</div>';
+  }
+  
+  const visualizerContent = document.getElementById('visualizerContent');
+  if (visualizerContent) {
+    visualizerContent.innerHTML = `
+      <div class="connect-prompt">
+        <button id="connectButton" class="connect-btn">
+          Connect Wallet to Load Memes
+        </button>
+      </div>
+    `;
+    // Re-attach event listener to the new connect button
+    const newConnectBtn = document.getElementById('connectButton');
+    if (newConnectBtn) {
+      newConnectBtn.addEventListener('click', connectWallet);
+    }
+  }
 
   console.log('Wallet disconnected');
 }
@@ -164,6 +195,132 @@ function resetConnectButton(): void {
   elements.connectButton.disabled = false;
   elements.connectButton.textContent = 'Connect Wallet';
 }
+
+// Authenticate with 6529
+async function authenticateWith6529(): Promise<void> {
+  if (!signer || !userAddress) {
+    return;
+  }
+
+  try {
+    console.log('Starting 6529 authentication...');
+    console.log('User address:', userAddress);
+    
+    // Check network - 6529 might require Ethereum mainnet
+    const network = await provider!.getNetwork();
+    console.log('Current network:', {
+      chainId: Number(network.chainId),
+      name: network.name
+    });
+    
+    // Set wallet address in SDK
+    sdk.setWalletAddress(userAddress);
+    
+    // Test API connectivity first
+    console.log('Testing 6529 API connectivity...');
+    const testResponse = await fetch('https://api.6529.io/api/auth/nonce?signer_address=' + userAddress);
+    console.log('API test response:', testResponse.status, testResponse.statusText);
+    
+    if (testResponse.ok) {
+      const responseData = await testResponse.json();
+      console.log('API response data:', JSON.stringify(responseData, null, 2));
+    } else {
+      const errorData = await testResponse.text();
+      console.log('API error response:', errorData);
+    }
+    
+    // Authenticate with 6529 using signer
+    console.log('Attempting authentication...');
+    await sdk.authenticate(async (message: string) => {
+      if (!signer) throw new Error('Signer not available');
+      console.log('Signing message:', message);
+      const signature = await signer.signMessage(message);
+      console.log('Signature generated:', signature.substring(0, 10) + '...');
+      return signature;
+    });
+    
+    // Fetch voting data (includes submissions)
+    console.log('Fetching voting data...');
+    votingData = await sdk.getVotingData();
+    
+    console.log('6529 authenticated successfully');
+    console.log('User TDH:', votingData.user.tdh);
+    console.log('Total submissions:', votingData.submissions.length);
+    
+    // Update the UI with submissions immediately
+    const playlistContent = document.getElementById('playlistContent');
+    if (playlistContent) {
+      const filteredSubmissions = votingData.submissions
+        .slice(0, 10);
+      
+      // Debug: Log the vote counts to verify sorting
+      console.log('Top 10 submissions by projected TDH votes:');
+      filteredSubmissions.forEach((sub, index) => {
+        console.log(`#${index + 1}: ${sub.title} - rating_prediction: ${sub.rating_prediction}, realtime_rating: ${sub.realtime_rating}, rank: ${sub.rank}`);
+      });
+      
+      playlistContent.innerHTML = filteredSubmissions.map((submission, index) => {
+        const votes = Math.round(submission.rating_prediction);
+        return `
+          <div class="playlist-item" data-submission-id="${submission.id}">
+            <span class="playlist-rank">${index + 1}.</span>
+            <span class="playlist-text">${submission.title || 'Untitled'} by ${submission.author.handle}</span>
+            <span class="playlist-votes">${votes}</span>
+          </div>
+        `;
+      }).join('');
+      
+      // Add click handlers for playlist items
+      document.querySelectorAll('.playlist-item').forEach(item => {
+        item.addEventListener('click', function(this: HTMLElement) {
+          const submissionId = this.getAttribute('data-submission-id');
+          const submission = filteredSubmissions.find(s => s.id === submissionId);
+          if (submission) {
+            loadSubmissionIntoVisualizer(submission);
+            
+            // Update active state
+            document.querySelectorAll('.playlist-item').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+          }
+        });
+      });
+      
+      // Auto-load first submission into visualizer
+      if (filteredSubmissions.length > 0) {
+        loadSubmissionIntoVisualizer(filteredSubmissions[0]);
+        document.querySelector('.playlist-item')?.classList.add('active');
+      }
+    }
+    
+  } catch (error) {
+    console.error('6529 authentication failed:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      signer: !!signer,
+      userAddress: userAddress,
+      hasUserAddress: !!userAddress
+    });
+    showError(`6529 authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// Load submission into the visualizer area
+function loadSubmissionIntoVisualizer(submission: any): void {
+  const visualizerContent = document.getElementById('visualizerContent');
+  if (!visualizerContent) return;
+  
+  const mediaUrl = submission.picture;
+  const isVideo = mediaUrl && (mediaUrl.toLowerCase().includes('.mp4') || mediaUrl.toLowerCase().includes('.webm') || mediaUrl.toLowerCase().includes('.mov') || mediaUrl.toLowerCase().includes('.avi') || mediaUrl.toLowerCase().includes('.m4v'));
+  
+  visualizerContent.innerHTML = `
+    ${isVideo ? 
+      `<video src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" autoplay muted loop playsinline></video>` :
+      `<img src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" />`
+    }
+  `;
+}
+
 
 // Export state getters
 export function getWalletState(): WalletState {
