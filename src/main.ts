@@ -2,6 +2,14 @@ import './style.css'
 import { initWallet } from './wallet'
 import type { WalletElements } from './types'
 import skinImage from './assets/MEMEAMP-skin-with-art-area.png'
+import sliderOrange from './assets/slider-orange.png'
+import sliderBlue from './assets/slider-blue.png'
+import connectWalletImg from './assets/connect-wallet.png'
+
+// Set CSS variables for slider images
+document.documentElement.style.setProperty('--slider-orange-url', `url(${sliderOrange})`);
+document.documentElement.style.setProperty('--slider-blue-url', `url(${sliderBlue})`);
+document.documentElement.style.setProperty('--connect-wallet-url', `url(${connectWalletImg})`);
 
 // Create the app HTML structure
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
@@ -13,11 +21,6 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <!-- Visualizer Area (Main Art Display) -->
       <div class="visualizer-area">
         <div id="visualizerContent" class="visualizer-content">
-          <div class="connect-prompt">
-            <button id="connectButton" class="connect-btn">
-              Connect Wallet to Load Memes
-            </button>
-          </div>
         </div>
       </div>
       
@@ -25,8 +28,28 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <div class="playlist-section">
         <div id="playlistContent" class="playlist-content">
           <div class="playlist-placeholder">
-            Connect wallet to load playlist...
+            <button id="connectButton" class="connect-btn-img"></button>
           </div>
+        </div>
+      </div>
+      
+      <!-- Action Buttons Under Playlist -->
+      <div class="action-buttons">
+        <a href="https://6529.io/" target="_blank" class="action-btn" title="!Seize"></a>
+        <a href="https://6529.io/nextgen/collections" target="_blank" class="action-btn" title="Next Gen RPT"></a>
+        <a href="https://x.com/search?q=from%3Apunk6529%20Whitepaper&src=typed_query" target="_blank" class="action-btn" title="RPT Whitepaper"></a>
+        <a href="https://medium.com/@brunopgalvao/substrate-cfeb13333f2c" target="_blank" class="action-btn" title="Make Blkchn"></a>
+      </div>
+      
+      <!-- Slider Controls -->
+      <div class="slider-controls">
+        <div class="slider-container">
+          <div class="slider-track"></div>
+          <div class="slider-handle orange" id="slider1" style="left: 30%"></div>
+        </div>
+        <div class="slider-container">
+          <div class="slider-track"></div>
+          <div class="slider-handle blue" id="slider2" style="left: 60%"></div>
         </div>
       </div>
       
@@ -54,3 +77,36 @@ const walletElements: WalletElements = {
 }
 
 initWallet(walletElements)
+
+// Initialize slider drag functionality
+function initSliders() {
+  const sliders = document.querySelectorAll('.slider-handle');
+  
+  sliders.forEach(slider => {
+    let isDragging = false;
+    let container: HTMLElement | null = null;
+    
+    slider.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      container = (slider as HTMLElement).closest('.slider-container');
+      e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging || !container) return;
+      
+      const rect = container.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+      
+      (slider as HTMLElement).style.left = `${percentage}%`;
+    });
+    
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      container = null;
+    });
+  });
+}
+
+initSliders()

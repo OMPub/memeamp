@@ -26,7 +26,6 @@ let elements: WalletElements;
 // Initialize wallet functionality
 export function initWallet(walletElements: WalletElements): void {
   elements = walletElements;
-  checkWalletConnection();
   setupEventListeners();
 }
 
@@ -42,25 +41,6 @@ function setupEventListeners(): void {
   }
 }
 
-// Check if wallet was previously connected
-async function checkWalletConnection(): Promise<void> {
-  if (typeof window.ethereum === 'undefined') {
-    return;
-  }
-
-  try {
-    const accounts = await window.ethereum.request({ 
-      method: 'eth_accounts' 
-    });
-    
-    if (accounts.length > 0) {
-      await connectWallet();
-    }
-  } catch (error) {
-    console.error('Error checking wallet connection:', error);
-  }
-}
-
 // Connect wallet
 async function connectWallet(): Promise<void> {
   // Check if MetaMask or another Web3 wallet is installed
@@ -72,7 +52,7 @@ async function connectWallet(): Promise<void> {
   try {
     // Request account access
     elements.connectButton.disabled = true;
-    elements.connectButton.textContent = 'Connecting...';
+    elements.connectButton.classList.add('connecting');
     hideError();
 
     // Create provider and request accounts
@@ -102,23 +82,20 @@ async function connectWallet(): Promise<void> {
     elements.networkName.textContent = networkNameText;
     elements.balance.textContent = `${parseFloat(balanceEth).toFixed(4)} ETH`;
 
-    // Show wallet info, hide connect button
-    elements.connectButton.classList.add('hidden');
+    // Don't hide button yet - keep it visible with pulsing animation
     elements.walletInfo.classList.remove('hidden');
 
     console.log('Wallet connected:', userAddress);
 
     // Authenticate with 6529 and fetch voting data
     await authenticateWith6529();
+    
+    // Now hide the button after everything is loaded
+    elements.connectButton.classList.add('hidden');
   } catch (error: any) {
     console.error('Error connecting wallet:', error);
     
-    if (error.code === 4001) {
-      showError('Connection request rejected. Please try again.');
-    } else {
-      showError('Failed to connect wallet. Please try again.');
-    }
-    
+    // Just reset the button - don't show error for user rejections
     resetConnectButton();
   }
 }
@@ -139,16 +116,9 @@ function disconnectWallet(): void {
   // Clear playlist and visualizer
   const playlistContent = document.getElementById('playlistContent');
   if (playlistContent) {
-    playlistContent.innerHTML = '<div class="playlist-placeholder">Connect wallet to load playlist...</div>';
-  }
-  
-  const visualizerContent = document.getElementById('visualizerContent');
-  if (visualizerContent) {
-    visualizerContent.innerHTML = `
-      <div class="connect-prompt">
-        <button id="connectButton" class="connect-btn">
-          Connect Wallet to Load Memes
-        </button>
+    playlistContent.innerHTML = `
+      <div class="playlist-placeholder">
+        <button id="connectButton" class="connect-btn-img"></button>
       </div>
     `;
     // Re-attach event listener to the new connect button
@@ -156,6 +126,11 @@ function disconnectWallet(): void {
     if (newConnectBtn) {
       newConnectBtn.addEventListener('click', connectWallet);
     }
+  }
+  
+  const visualizerContent = document.getElementById('visualizerContent');
+  if (visualizerContent) {
+    visualizerContent.innerHTML = '';
   }
 
   console.log('Wallet disconnected');
@@ -193,7 +168,7 @@ function hideError(): void {
 
 function resetConnectButton(): void {
   elements.connectButton.disabled = false;
-  elements.connectButton.textContent = 'Connect Wallet';
+  elements.connectButton.classList.remove('connecting');
 }
 
 // Authenticate with 6529
@@ -260,7 +235,7 @@ async function authenticateWith6529(): Promise<void> {
       });
       
       playlistContent.innerHTML = filteredSubmissions.map((submission, index) => {
-        const votes = Math.round(submission.rating_prediction);
+        const votes = formatVotes(Math.round(submission.rating_prediction));
         return `
           <div class="playlist-item" data-submission-id="${submission.id}">
             <span class="playlist-rank">${index + 1}.</span>
@@ -294,14 +269,18 @@ async function authenticateWith6529(): Promise<void> {
     
   } catch (error) {
     console.error('6529 authentication failed:', error);
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      signer: !!signer,
-      userAddress: userAddress,
-      hasUserAddress: !!userAddress
-    });
-    showError(`6529 authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Don't show error message - just log to console
+  }
+}
+
+// Format vote numbers in millions with 1 decimal
+function formatVotes(votes: number): string {
+  if (votes >= 1000000) {
+    return (votes / 1000000).toFixed(1) + 'M';
+  } else if (votes >= 1000) {
+    return (votes / 1000).toFixed(1) + 'K';
+  } else {
+    return votes.toString();
   }
 }
 
