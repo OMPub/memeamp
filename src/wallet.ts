@@ -158,6 +158,7 @@ function disconnectWallet(): void {
         <button id="connectButton" class="connect-btn-img"></button>
       </div>
     `;
+    
     // Re-attach event listener to the new connect button
     const newConnectBtn = document.getElementById('connectButton');
     if (newConnectBtn) {
@@ -165,10 +166,25 @@ function disconnectWallet(): void {
     }
   }
   
+  // Clear now playing text
+  const nowPlayingText = document.getElementById('nowPlayingText');
+  if (nowPlayingText) {
+    nowPlayingText.textContent = '';
+  }
+  
+  // Clear visualizer content
   const visualizerContent = document.getElementById('visualizerContent');
   if (visualizerContent) {
     visualizerContent.innerHTML = '';
   }
+  
+  // Reset sliders to 0%
+  const sliders = document.querySelectorAll('.slider-handle');
+  sliders.forEach(slider => {
+    if (slider instanceof HTMLElement) {
+      slider.style.left = '0%';
+    }
+  });
 
   // Swap back to static brain image when disconnected
   swapBrainwaveVisualizer(false);

@@ -55,7 +55,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       </div>
       
       <!-- Post Thread Button -->
-      <a href="https://x.com/compose/post?text=are you on 6529 .io? then check this out: https://memeamp.com" target="_blank" class="post-thread-btn" title="Post Thread"></a>
+      <a href="https://x.com/compose/post?text=Stream the memes on https://memeamp.com by @mintfaced" target="_blank" class="post-thread-btn" title="Post Thread"></a>
       
       <!-- Slider Controls -->
       <div class="slider-controls">
