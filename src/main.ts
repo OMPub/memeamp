@@ -5,8 +5,7 @@ import skinImage from './assets/MEMEAMP-skin-with-art-area.png'
 import sliderOrange from './assets/slider-orange.png'
 import sliderBlue from './assets/slider-blue.png'
 import connectWalletImg from './assets/connect-wallet.png'
-import waveBg from './assets/wave-bg.png'
-import waveGif from './assets/Wave-music.gif'
+import brainwaveVideo from './assets/brainwave.mov'
 
 // Set CSS variables for slider images
 document.documentElement.style.setProperty('--slider-orange-url', `url(${sliderOrange})`);
@@ -22,8 +21,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       
       <!-- Wave Visualizer (Upper Left) -->
       <div class="wave-visualizer">
-        <img src="${waveBg}" class="wave-bg" alt="Wave Background" />
-        <img src="${waveGif}" class="wave-animation" alt="Wave Animation" />
+        <video src="${brainwaveVideo}" class="brainwave-video" autoplay loop muted playsinline></video>
       </div>
       
       <!-- Now Playing Display -->
