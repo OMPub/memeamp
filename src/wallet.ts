@@ -26,6 +26,7 @@ let elements: WalletElements;
 // Initialize wallet functionality
 export function initWallet(walletElements: WalletElements): void {
   elements = walletElements;
+  checkWalletConnection();
   setupEventListeners();
 }
 
@@ -38,6 +39,25 @@ function setupEventListeners(): void {
   if (window.ethereum) {
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
+  }
+}
+
+// Check if wallet was previously connected
+async function checkWalletConnection(): Promise<void> {
+  if (typeof window.ethereum === 'undefined') {
+    return;
+  }
+
+  try {
+    const accounts = await window.ethereum.request({ 
+      method: 'eth_accounts' 
+    });
+    
+    if (accounts.length > 0) {
+      await connectWallet();
+    }
+  } catch (error) {
+    console.error('Error checking wallet connection:', error);
   }
 }
 
