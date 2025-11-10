@@ -6,6 +6,7 @@ import sliderOrange from './assets/slider-orange.png'
 import sliderBlue from './assets/slider-blue.png'
 import connectWalletImg from './assets/connect-wallet.png'
 import brainwaveVideo from './assets/brainwave.mov'
+import brainNoWave from './assets/brain-no-wave.png'
 
 // Set CSS variables for slider images
 document.documentElement.style.setProperty('--slider-orange-url', `url(${sliderOrange})`);
@@ -21,7 +22,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       
       <!-- Wave Visualizer (Upper Left) -->
       <div class="wave-visualizer">
-        <video src="${brainwaveVideo}" class="brainwave-video" autoplay loop muted playsinline></video>
+        <img src="${brainNoWave}" class="brain-no-wave" alt="Brain No Wave" />
+        <video src="${brainwaveVideo}" class="brainwave-video" autoplay loop muted playsinline style="display: none;"></video>
       </div>
       
       <!-- Now Playing Display -->

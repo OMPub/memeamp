@@ -112,6 +112,9 @@ async function connectWallet(): Promise<void> {
     
     // Now hide the button after everything is loaded
     elements.connectButton.classList.add('hidden');
+    
+    // Swap to brainwave video when connected
+    swapBrainwaveVisualizer(true);
   } catch (error: any) {
     console.error('Error connecting wallet:', error);
     
@@ -152,6 +155,9 @@ function disconnectWallet(): void {
   if (visualizerContent) {
     visualizerContent.innerHTML = '';
   }
+
+  // Swap back to static brain image when disconnected
+  swapBrainwaveVisualizer(false);
 
   console.log('Wallet disconnected');
 }
@@ -339,6 +345,26 @@ function loadSubmissionIntoVisualizer(submission: any): void {
   }
 }
 
+
+// Swap brainwave visualizer between static image and video
+function swapBrainwaveVisualizer(isConnected: boolean): void {
+  const brainNoWave = document.querySelector('.brain-no-wave') as HTMLImageElement;
+  const brainwaveVideo = document.querySelector('.brainwave-video') as HTMLVideoElement;
+  
+  if (brainNoWave && brainwaveVideo) {
+    if (isConnected) {
+      // Show video, hide image
+      brainNoWave.style.display = 'none';
+      brainwaveVideo.style.display = 'block';
+      brainwaveVideo.play().catch(e => console.log('Video play failed:', e));
+    } else {
+      // Show image, hide video
+      brainNoWave.style.display = 'block';
+      brainwaveVideo.style.display = 'none';
+      brainwaveVideo.pause();
+    }
+  }
+}
 
 // Export state getters
 export function getWalletState(): WalletState {
