@@ -290,12 +290,12 @@ body {
 /* Action Buttons Under Playlist */
 .action-buttons {
   position: absolute;
-  top: 41%;
-  left: 4%;
-  width: 43%;
-  height: 5%;
+  top: 430px;
+  left: 30px;
+  width: 240px;
+  height: 40px;
   display: flex;
-  gap: 2%;
+  gap: 7px;
   z-index: 2;
 }
 
@@ -310,6 +310,27 @@ body {
 }
 
 .action-btn:hover {
+  opacity: 0.2;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Post Thread Button - Independent positioning */
+.post-thread-btn {
+  position: absolute;
+  top: 430px;
+  left: 500px;
+  width: 50px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  text-decoration: none;
+  z-index: 2;
+}
+
+.post-thread-btn:hover {
   opacity: 0.2;
   background: rgba(255, 255, 255, 0.1);
 }

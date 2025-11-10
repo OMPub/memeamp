@@ -77,7 +77,15 @@ async function connectWallet(): Promise<void> {
 
     // Create provider and request accounts
     provider = new ethers.BrowserProvider(window.ethereum);
-    const accounts = await provider.send('eth_requestAccounts', []);
+    
+    let accounts;
+    try {
+      accounts = await provider.send('eth_requestAccounts', []);
+    } catch (accountError: any) {
+      console.log('User cancelled wallet request or wallet error:', accountError);
+      resetConnectButton();
+      return;
+    }
     
     if (accounts.length === 0) {
       showError('No accounts found. Please unlock your wallet.');
@@ -103,23 +111,29 @@ async function connectWallet(): Promise<void> {
     elements.balance.textContent = `${parseFloat(balanceEth).toFixed(4)} ETH`;
 
     // Don't hide button yet - keep it visible with pulsing animation
-    elements.walletInfo.classList.remove('hidden');
-
+    // Also don't show wallet info yet - wait for full authentication
     console.log('Wallet connected:', userAddress);
 
     // Authenticate with 6529 and fetch voting data
     await authenticateWith6529();
     
-    // Now hide the button after everything is loaded
+    // Only after complete success: show wallet info, hide button, start brainwave
+    elements.walletInfo.classList.remove('hidden');
     elements.connectButton.classList.add('hidden');
-    
-    // Swap to brainwave video when connected
     swapBrainwaveVisualizer(true);
   } catch (error: any) {
     console.error('Error connecting wallet:', error);
+    console.log('Resetting UI due to error...');
     
-    // Just reset the button - don't show error for user rejections
+    // Hide wallet info and show connect button
+    elements.walletInfo.classList.add('hidden');
+    elements.connectButton.classList.remove('hidden');
     resetConnectButton();
+    
+    // Ensure brainwave stays in disconnected state on error
+    swapBrainwaveVisualizer(false);
+    
+    console.log('UI reset complete');
   }
 }
 
@@ -294,8 +308,9 @@ async function authenticateWith6529(): Promise<void> {
     }
     
   } catch (error) {
-    console.error('6529 authentication failed:', error);
-    // Don't show error message - just log to console
+    console.info('6529 authentication cancelled or failed:', error);
+    // Don't show error message - just log to console and re-throw
+    throw error;
   }
 }
 
@@ -325,10 +340,16 @@ function loadSubmissionIntoVisualizer(submission: any): void {
     }
   `;
   
-  // Update now playing text
+  // Update now playing text with submission details
   const nowPlayingText = document.getElementById('nowPlayingText');
   if (nowPlayingText) {
-    const text = `${submission.title || 'Untitled'} by ${submission.author.handle}`;
+    const title = submission.title || 'Untitled';
+    const author = submission.author?.handle || 'Unknown';
+    const predictedTDH = submission.rating_prediction?.toLocaleString() || '0';
+    const voterCount = submission.raters_count || 0;
+    
+    // Show title, author, predicted TDH, and voter count
+    const text = `${title} by ${author} - ${predictedTDH} TDH (${voterCount} voters)`;
     nowPlayingText.textContent = text;
     
     // Check if text overflows and apply scrolling animation

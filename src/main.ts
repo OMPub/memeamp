@@ -54,6 +54,9 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <a href="https://medium.com/@brunopgalvao/substrate-cfeb13333f2c" target="_blank" class="action-btn" title="Make Blkchn"></a>
       </div>
       
+      <!-- Post Thread Button -->
+      <a href="https://x.com/compose/post?text=are you on 6529 .io? then check this out: https://memeamp.com" target="_blank" class="post-thread-btn" title="Post Thread"></a>
+      
       <!-- Slider Controls -->
       <div class="slider-controls">
         <div class="slider-container">
