@@ -314,10 +314,29 @@ function loadSubmissionIntoVisualizer(submission: any): void {
   
   visualizerContent.innerHTML = `
     ${isVideo ? 
-      `<video src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" autoplay muted loop playsinline></video>` :
+      `<video src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" autoplay loop playsinline></video>` :
       `<img src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" />`
     }
   `;
+  
+  // Update now playing text
+  const nowPlayingText = document.getElementById('nowPlayingText');
+  if (nowPlayingText) {
+    const text = `${submission.title || 'Untitled'} by ${submission.author.handle}`;
+    nowPlayingText.textContent = text;
+    
+    // Check if text overflows and apply scrolling animation
+    setTimeout(() => {
+      const textWidth = nowPlayingText.scrollWidth;
+      const containerWidth = nowPlayingText.parentElement?.clientWidth || 320;
+      
+      if (textWidth > containerWidth) {
+        nowPlayingText.classList.remove('short');
+      } else {
+        nowPlayingText.classList.add('short');
+      }
+    }, 0);
+  }
 }
 
 

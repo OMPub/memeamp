@@ -44,6 +44,75 @@ body {
   pointer-events: none;
 }
 
+/* Wave Visualizer (Upper Left) */
+.wave-visualizer {
+  position: absolute;
+  top: 49px;
+  left: 30px;
+  width: 195px;
+  height: 75px;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.wave-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wave-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: screen;
+}
+
+/* Now Playing Display */
+.now-playing {
+  position: absolute;
+  top: 30px;
+  left: 250px;
+  width: 320px;
+  height: 6%;
+  display: flex;
+  align-items: center;
+  justify-content: left;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.now-playing-text {
+  font-family: 'OCR-B', monospace;
+  font-size: 14px;
+  color: #00ff00;
+  white-space: nowrap;
+  width: 100%;
+  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+  display: inline-block;
+  animation: marquee 7s linear infinite;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(50%);
+  }
+  100% {
+    transform: translateX(-120%);
+  }
+}
+
+.now-playing-text.short {
+  animation: none;
+  text-align: center;
+}
+
 /* Visualizer Area (Main Art Display) - Overlays on "MEME ART" section */
 .visualizer-area {
   position: absolute;

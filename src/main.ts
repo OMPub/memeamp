@@ -5,6 +5,8 @@ import skinImage from './assets/MEMEAMP-skin-with-art-area.png'
 import sliderOrange from './assets/slider-orange.png'
 import sliderBlue from './assets/slider-blue.png'
 import connectWalletImg from './assets/connect-wallet.png'
+import waveBg from './assets/wave-bg.png'
+import waveGif from './assets/Wave-music.gif'
 
 // Set CSS variables for slider images
 document.documentElement.style.setProperty('--slider-orange-url', `url(${sliderOrange})`);
@@ -17,6 +19,17 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <!-- Background Skin -->
     <div class="player-skin">
       <img src="${skinImage}" alt="MEMEAMP Player" class="skin-image" />
+      
+      <!-- Wave Visualizer (Upper Left) -->
+      <div class="wave-visualizer">
+        <img src="${waveBg}" class="wave-bg" alt="Wave Background" />
+        <img src="${waveGif}" class="wave-animation" alt="Wave Animation" />
+      </div>
+      
+      <!-- Now Playing Display -->
+      <div class="now-playing">
+        <div id="nowPlayingText" class="now-playing-text"></div>
+      </div>
       
       <!-- Visualizer Area (Main Art Display) -->
       <div class="visualizer-area">
