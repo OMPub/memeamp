@@ -272,15 +272,15 @@ body {
 /* Orange slider (top) */
 .slider-container:nth-child(1) {
   top: 125px;
-  left: 240px;
-  width: 130px;
+  left: 250px;
+  width: 110px;
 }
 
 /* Blue slider (bottom) */
 .slider-container:nth-child(2) {
   top: 125px;
-  left: 390px;
-  width: 70px;
+  left: 400px;
+  width: 50px;
 }
 
 .slider-track {
