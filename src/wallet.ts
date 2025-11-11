@@ -6,6 +6,8 @@ import SixFiveTwoNineVotingSDK, { type VotingData } from './6529-sdk';
 let provider: ethers.BrowserProvider | null = null;
 let signer: ethers.JsonRpcSigner | null = null;
 let userAddress: string | null = null;
+let currentSubmissionIndex: number = 0;
+let currentSubmissions: any[] = [];
 
 // 6529 SDK
 const sdk = new SixFiveTwoNineVotingSDK();
@@ -28,6 +30,20 @@ export function initWallet(walletElements: WalletElements): void {
   elements = walletElements;
   checkWalletConnection();
   setupEventListeners();
+  
+  // Add navigation button event listeners
+  document.addEventListener('DOMContentLoaded', () => {
+    const prevButton = document.getElementById('prevButton');
+    const nextButton = document.getElementById('nextButton');
+    
+    if (prevButton) {
+      prevButton.addEventListener('click', showPreviousSubmission);
+    }
+    
+    if (nextButton) {
+      nextButton.addEventListener('click', showNextSubmission);
+    }
+  });
 }
 
 // Event listeners
@@ -178,6 +194,9 @@ function disconnectWallet(): void {
     visualizerContent.innerHTML = '';
   }
   
+  // Clear wallet info display
+  updateWalletInfoDisplay(0, 0);
+  
   // Reset sliders to 0%
   const sliders = document.querySelectorAll('.slider-handle');
   sliders.forEach(slider => {
@@ -278,19 +297,23 @@ async function authenticateWith6529(): Promise<void> {
     console.log('User TDH:', votingData.user.tdh);
     console.log('Total submissions:', votingData.submissions.length);
     
+    // Update wallet info display
+    console.log('Updating wallet info display with TDH:', votingData.user.tdh, 'Available TDH:', votingData.user.availableTDH);
+    updateWalletInfoDisplay(votingData.user.tdh, votingData.user.availableTDH);
+    
     // Update the UI with submissions immediately
     const playlistContent = document.getElementById('playlistContent');
     if (playlistContent) {
-      const filteredSubmissions = votingData.submissions
-        .slice(0, 10);
+      currentSubmissions = votingData.submissions.slice(0, 10);
+      currentSubmissionIndex = 0; // Reset to first submission
       
       // Debug: Log the vote counts to verify sorting
       console.log('Top 10 submissions by projected TDH votes:');
-      filteredSubmissions.forEach((sub, index) => {
+      currentSubmissions.forEach((sub, index) => {
         console.log(`#${index + 1}: ${sub.title} - rating_prediction: ${sub.rating_prediction}, realtime_rating: ${sub.realtime_rating}, rank: ${sub.rank}`);
       });
       
-      playlistContent.innerHTML = filteredSubmissions.map((submission, index) => {
+      playlistContent.innerHTML = currentSubmissions.map((submission: any, index: number) => {
         const votes = formatVotes(Math.round(submission.rating_prediction));
         return `
           <div class="playlist-item" data-submission-id="${submission.id}">
@@ -302,23 +325,20 @@ async function authenticateWith6529(): Promise<void> {
       }).join('');
       
       // Add click handlers for playlist items
-      document.querySelectorAll('.playlist-item').forEach(item => {
+      document.querySelectorAll('.playlist-item').forEach((item, index) => {
         item.addEventListener('click', function(this: HTMLElement) {
-          const submissionId = this.getAttribute('data-submission-id');
-          const submission = filteredSubmissions.find(s => s.id === submissionId);
+          currentSubmissionIndex = index;
+          const submission = currentSubmissions[index];
           if (submission) {
             loadSubmissionIntoVisualizer(submission);
-            
-            // Update active state
-            document.querySelectorAll('.playlist-item').forEach(i => i.classList.remove('active'));
-            this.classList.add('active');
+            updateActivePlaylistItem();
           }
         });
       });
       
       // Auto-load first submission into visualizer
-      if (filteredSubmissions.length > 0) {
-        loadSubmissionIntoVisualizer(filteredSubmissions[0]);
+      if (currentSubmissions.length > 0) {
+        loadSubmissionIntoVisualizer(currentSubmissions[0]);
         document.querySelector('.playlist-item')?.classList.add('active');
       }
     }
@@ -342,6 +362,56 @@ function formatVotes(votes: number): string {
 }
 
 // Load submission into the visualizer area
+// Update wallet info display
+function updateWalletInfoDisplay(tdh: number, rep: number): void {
+  const tdhElement = document.getElementById('walletTdh');
+  const repElement = document.getElementById('walletRep');
+  
+  console.log('updateWalletInfoDisplay called with TDH:', tdh, 'REP:', rep);
+  console.log('TDH element found:', !!tdhElement, 'REP element found:', !!repElement);
+  
+  if (tdhElement) {
+    tdhElement.textContent = tdh.toLocaleString();
+    console.log('Set TDH element text to:', tdhElement.textContent);
+  }
+  
+  if (repElement) {
+    repElement.textContent = rep.toLocaleString();
+    console.log('Set REP element text to:', repElement.textContent);
+  }
+}
+
+// Navigation functions
+function showNextSubmission(): void {
+  if (currentSubmissions.length === 0) return;
+  
+  currentSubmissionIndex = (currentSubmissionIndex + 1) % currentSubmissions.length;
+  const submission = currentSubmissions[currentSubmissionIndex];
+  loadSubmissionIntoVisualizer(submission);
+  updateActivePlaylistItem();
+}
+
+function showPreviousSubmission(): void {
+  if (currentSubmissions.length === 0) return;
+  
+  currentSubmissionIndex = (currentSubmissionIndex - 1 + currentSubmissions.length) % currentSubmissions.length;
+  const submission = currentSubmissions[currentSubmissionIndex];
+  loadSubmissionIntoVisualizer(submission);
+  updateActivePlaylistItem();
+}
+
+function updateActivePlaylistItem(): void {
+  document.querySelectorAll('.playlist-item').forEach((item, index) => {
+    if (index === currentSubmissionIndex) {
+      item.classList.add('active');
+      // Scroll the active item into view
+      item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      item.classList.remove('active');
+    }
+  });
+}
+
 function loadSubmissionIntoVisualizer(submission: any): void {
   const visualizerContent = document.getElementById('visualizerContent');
   if (!visualizerContent) return;
@@ -349,12 +419,27 @@ function loadSubmissionIntoVisualizer(submission: any): void {
   const mediaUrl = submission.picture;
   const isVideo = mediaUrl && (mediaUrl.toLowerCase().includes('.mp4') || mediaUrl.toLowerCase().includes('.webm') || mediaUrl.toLowerCase().includes('.mov') || mediaUrl.toLowerCase().includes('.avi') || mediaUrl.toLowerCase().includes('.m4v'));
   
-  visualizerContent.innerHTML = `
-    ${isVideo ? 
-      `<video src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" autoplay loop playsinline></video>` :
-      `<img src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" />`
+  visualizerContent.innerHTML = isVideo ? 
+    `<video src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" autoplay loop playsinline></video>` :
+    `<img src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" />`;
+  
+  // Try to play the video with sound if it's a video
+  if (isVideo) {
+    const video = visualizerContent.querySelector('video');
+    if (video) {
+      // Try to play with sound
+      const playPromise = video.play();
+      
+      // Handle autoplay restrictions
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Autoplay with sound failed, trying muted playback:', error);
+          video.muted = true;
+          video.play().catch(e => console.log('Muted playback also failed:', e));
+        });
+      }
     }
-  `;
+  }
   
   // Update now playing text with submission details
   const nowPlayingText = document.getElementById('nowPlayingText');

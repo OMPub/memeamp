@@ -1,17 +1,35 @@
 import './style.css'
 import { initWallet } from './wallet'
 import type { WalletElements } from './types'
-import skinImage from './assets/MEMEAMP-skin-with-art-area.png'
+import skinImage from './assets/MEMEAMP-skin.jpg'
 import sliderOrange from './assets/slider-orange.png'
 import sliderBlue from './assets/slider-blue.png'
 import connectWalletImg from './assets/connect-wallet.png'
 import brainwaveVideo from './assets/brainwave.mov'
 import brainNoWave from './assets/brain-no-wave.png'
+import leftBtnDefault from './assets/memeamp-buttons/LEFT_default.png'
+import leftBtnHover from './assets/memeamp-buttons/LEFT_hover.png'
+import leftBtnClick from './assets/memeamp-buttons/LEFT_click.png'
+import rightBtnDefault from './assets/memeamp-buttons/RIGHT_default.png'
+import rightBtnHover from './assets/memeamp-buttons/RIGHT_hover.png'
+import rightBtnClick from './assets/memeamp-buttons/RIGHT_click.png'
+import plusBtnDefault from './assets/memeamp-buttons/PLUS_default.png'
+import plusBtnHover from './assets/memeamp-buttons/PLUS_hover.png'
+import plusBtnClick from './assets/memeamp-buttons/PLUS_click.png'
 
-// Set CSS variables for slider images
+// Set CSS variables for images
 document.documentElement.style.setProperty('--slider-orange-url', `url(${sliderOrange})`);
 document.documentElement.style.setProperty('--slider-blue-url', `url(${sliderBlue})`);
 document.documentElement.style.setProperty('--connect-wallet-url', `url(${connectWalletImg})`);
+document.documentElement.style.setProperty('--left-btn-default', `url(${leftBtnDefault})`);
+document.documentElement.style.setProperty('--left-btn-hover', `url(${leftBtnHover})`);
+document.documentElement.style.setProperty('--left-btn-click', `url(${leftBtnClick})`);
+document.documentElement.style.setProperty('--right-btn-default', `url(${rightBtnDefault})`);
+document.documentElement.style.setProperty('--right-btn-hover', `url(${rightBtnHover})`);
+document.documentElement.style.setProperty('--right-btn-click', `url(${rightBtnClick})`);
+document.documentElement.style.setProperty('--add-btn-default', `url(${plusBtnDefault})`);
+document.documentElement.style.setProperty('--add-btn-hover', `url(${plusBtnHover})`);
+document.documentElement.style.setProperty('--add-btn-click', `url(${plusBtnClick})`);
 
 // Create the app HTML structure
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
@@ -31,6 +49,16 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <div id="nowPlayingText" class="now-playing-text"></div>
       </div>
       
+      <!-- Wallet Info Display -->
+      <div class="wallet-info">
+        <div class="wallet-rep">
+          <span id="walletRep" class="wallet-value">0</span>
+        </div>
+        <div class="wallet-tdh">
+          <span id="walletTdh" class="wallet-value">0</span>
+        </div>
+      </div>
+      
       <!-- Visualizer Area (Main Art Display) -->
       <div class="visualizer-area">
         <div id="visualizerContent" class="visualizer-content">
@@ -44,6 +72,16 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
             <button id="connectButton" class="connect-btn-img"></button>
           </div>
         </div>
+      </div>
+      
+      <!-- Navigation Buttons -->
+      <div class="nav-buttons">
+        <button id="prevButton" class="nav-btn prev-btn" title="PREV"></button>
+        <button id="addButton" class="nav-btn add-btn" title="BOOST"></button>
+        <button id="nextButton" class="nav-btn next-btn" title="NEXT"></button>
+        
+        <!-- MY WAVES Clickable Area -->
+        <button id="myWavesButton" class="my-waves-button" title="Load My Waves"></button>
       </div>
       
       <!-- Action Buttons Under Playlist -->
