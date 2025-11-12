@@ -49,13 +49,13 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <div id="nowPlayingText" class="now-playing-text"></div>
       </div>
       
-      <!-- Wallet Info Display -->
-      <div class="wallet-info">
-        <div class="wallet-rep">
-          <span id="walletRep" class="wallet-value">0</span>
+      <!-- Identity Info Display -->
+      <div class="identity-info">
+        <div class="identity-rep">
+          <span id="identityRep" class="identity-value">0</span>
         </div>
-        <div class="wallet-tdh">
-          <span id="walletTdh" class="wallet-value">0</span>
+        <div class="identity-tdh">
+          <span id="identityTdh" class="identity-value" title="TDH Voted for this meme">0</span>
         </div>
       </div>
       
@@ -77,7 +77,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <!-- Navigation Buttons -->
       <div class="nav-buttons">
         <button id="prevButton" class="nav-btn prev-btn" title="PREV"></button>
-        <button id="addButton" class="nav-btn add-btn" title="BOOST"></button>
+        <button id="addButton" class="nav-btn add-btn" title="BOOST: Instantly add 10% of available TDH"></button>
         <button id="nextButton" class="nav-btn next-btn" title="NEXT"></button>
         
         <!-- MY WAVES Clickable Area -->

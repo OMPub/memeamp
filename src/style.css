@@ -92,44 +92,45 @@ body {
   line-height: 1;
 }
 
-/* Wallet Info Display - Temporary Highlight */
-.wallet-info {
+/* Identity Info Display - Compact */
+.identity-info {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 300px;
-  height: 80px;
+  top: 87px;
+  left: 233px;
+  width: 137px;
+  height: 20px;
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
   align-items: center;
-  background-color: rgba(0, 255, 0, 1);
-  padding: 20px;
-  border: 5px solid #ff0000;
-  border-radius: 10px;
-  z-index: 9999; /* Ensure it's on top */
-  box-shadow: 0 0 20px rgba(255, 0, 0, 1);
-}
-
-.wallet-rep,
-.wallet-tdh {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.wallet-value {
-  font-family: 'OCR-B', monospace;
-  font-size: 16px;
-  font-weight: bold;
-  color: #ff0000; /* Bright red for visibility */
-  text-shadow: 0 0 5px rgba(255, 0, 0, 0.8);
-  line-height: 1;
+  background-color: transparent;
   padding: 2px 8px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 3px;
-  min-width: 60px;
-  text-align: center;
+  z-index: 1000;
+  font-size: 12px;
+  line-height: 1;
+  font-family: 'OCR-B', monospace;
+}
+
+.identity-info *:focus,
+.identity-info *:focus-visible {
+  outline: none !important;
+}
+
+.identity-rep,
+.identity-tdh {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.identity-value {
+  font-family: 'OCR-B', monospace;
+  font-weight: normal;
+  color: #00ff00;
+  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+  min-width: 30px;
+  text-align: right;
+  outline: none !important;
+  pointer-events: none;
 }
 
 @keyframes marquee {

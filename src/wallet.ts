@@ -194,8 +194,8 @@ function disconnectWallet(): void {
     visualizerContent.innerHTML = '';
   }
   
-  // Clear wallet info display
-  updateWalletInfoDisplay(0, 0);
+  // Clear identity info display
+  updateIdentityInfoDisplay(0, 0);
   
   // Reset sliders to 0%
   const sliders = document.querySelectorAll('.slider-handle');
@@ -297,9 +297,9 @@ async function authenticateWith6529(): Promise<void> {
     console.log('User TDH:', votingData.user.tdh);
     console.log('Total submissions:', votingData.submissions.length);
     
-    // Update wallet info display
-    console.log('Updating wallet info display with TDH:', votingData.user.tdh, 'Available TDH:', votingData.user.availableTDH);
-    updateWalletInfoDisplay(votingData.user.tdh, votingData.user.availableTDH);
+    // Update identity info display
+    console.log('Updating identity info display with TDH:', votingData.user.tdh, 'Available TDH:', votingData.user.availableTDH);
+    updateIdentityInfoDisplay(votingData.user.tdh, votingData.user.availableTDH);
     
     // Update the UI with submissions immediately
     const playlistContent = document.getElementById('playlistContent');
@@ -362,21 +362,33 @@ function formatVotes(votes: number): string {
 }
 
 // Load submission into the visualizer area
-// Update wallet info display
-function updateWalletInfoDisplay(tdh: number, rep: number): void {
-  const tdhElement = document.getElementById('walletTdh');
-  const repElement = document.getElementById('walletRep');
+// Format number with K/M/B suffixes (3 significant figures)
+function formatNumber(num: number): string {
+  if (num >= 1000000000) {
+    return (num / 1000000000).toPrecision(3) + 'B';
+  } else if (num >= 1000000) {
+    return (num / 1000000).toPrecision(3) + 'M';
+  } else if (num >= 1000) {
+    return (num / 1000).toPrecision(3) + 'K';
+  }
+  return num.toPrecision(3);
+}
+
+// Update identity info display
+function updateIdentityInfoDisplay(tdh: number, rep: number): void {
+  const tdhElement = document.getElementById('identityTdh');
+  const repElement = document.getElementById('identityRep');
   
-  console.log('updateWalletInfoDisplay called with TDH:', tdh, 'REP:', rep);
+  console.log('updateIdentityInfoDisplay called with TDH:', tdh, 'REP:', rep);
   console.log('TDH element found:', !!tdhElement, 'REP element found:', !!repElement);
   
   if (tdhElement) {
-    tdhElement.textContent = tdh.toLocaleString();
+    tdhElement.textContent = formatNumber(tdh);
     console.log('Set TDH element text to:', tdhElement.textContent);
   }
   
   if (repElement) {
-    repElement.textContent = rep.toLocaleString();
+    repElement.textContent = formatNumber(rep);
     console.log('Set REP element text to:', repElement.textContent);
   }
 }
@@ -464,6 +476,21 @@ function loadSubmissionIntoVisualizer(submission: any): void {
         nowPlayingText.classList.add('short');
       }
     }, 0);
+  }
+
+  // Update Identity TDH to user's assigned TDH for this submission
+  try {
+    const assignedTDH = (votingData && (votingData as any).userVotesMap)
+      ? ((votingData as any).userVotesMap[submission.id] || 0)
+      : 0;
+    // Keep REP as current availableTDH for now (until we define Meme Artist Rep source)
+    const repValue = (votingData && (votingData as any).user)
+      ? (votingData as any).user.availableTDH || 0
+      : 0;
+    updateIdentityInfoDisplay(assignedTDH, repValue);
+    console.log('Updated identity TDH for submission', submission.id, 'assigned:', assignedTDH);
+  } catch (e) {
+    console.log('Could not update identity TDH for submission:', e);
   }
 }
 
