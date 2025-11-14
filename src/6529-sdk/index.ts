@@ -108,6 +108,7 @@ export type SDKEvent =
   | 'dataError'
   | 'voting'
   | 'voteSubmitted'
+  | 'leaderboardUpdated'
   | 'voteError'
   | 'repAssigning'
   | 'repAssigned'
@@ -128,6 +129,7 @@ export interface SDKEventData {
   voting?: { dropId: string; amount: number };
   voteSubmitted?: { dropId: string; amount: number; response: any };
   voteError?: { dropId: string; amount: number; error: string };
+  leaderboardUpdated?: { drops: any[] };
   repAssigning?: { identity: string; amount: number; category?: string };
   repAssigned?: { identity: string; amount: number; category?: string; response: RepAssignmentResponse };
   repError?: { identity: string; amount: number; category?: string; error: string };
@@ -147,6 +149,7 @@ export interface SubmissionOptions {
 
 export interface VotingDataOptions {
   waveId?: string;
+  immediate?: boolean;
 }
 
 export class SixFiveTwoNineVotingSDK {
@@ -558,9 +561,15 @@ export class SixFiveTwoNineVotingSDK {
 
   private async fetchAllLeaderboardDrops(
     waveId: string,
-    options: { sort?: string; sortDirection?: 'ASC' | 'DESC'; pageSize?: number } = {}
+    options: { sort?: string; sortDirection?: 'ASC' | 'DESC'; pageSize?: number; immediate?: boolean } = {}
   ): Promise<any[]> {
-    const { sort = 'RANK', sortDirection = 'ASC', pageSize = 100 } = options;
+    const { sort = 'RANK', sortDirection = 'ASC', pageSize = 100, immediate = false } = options;
+    
+    if (immediate) {
+      // For immediate display, return first page only, then load rest in background
+      return this.fetchLeaderboardDropsImmediate(waveId, { sort, sortDirection, pageSize });
+    }
+    
     const allDrops: any[] = [];
     let page = 1;
 
@@ -579,6 +588,55 @@ export class SixFiveTwoNineVotingSDK {
     }
 
     return allDrops;
+  }
+
+  private async fetchLeaderboardDropsImmediate(
+    waveId: string,
+    options: { sort?: string; sortDirection?: 'ASC' | 'DESC'; pageSize?: number } = {}
+  ): Promise<any[]> {
+    const { sort = 'RANK', sortDirection = 'ASC', pageSize = 100 } = options;
+    
+    // Get first page immediately
+    const firstPageResponse = await this.authenticatedRequest(
+      `/api/waves/${waveId}/leaderboard?page_size=${pageSize}&page=1&sort=${sort}&sort_direction=${sortDirection}`
+    );
+    const firstPageDrops = firstPageResponse.drops || [];
+    
+    // Start loading remaining pages in background without blocking
+    this.loadRemainingPagesInBackground(waveId, { sort, sortDirection, pageSize });
+    
+    return firstPageDrops;
+  }
+
+  private async loadRemainingPagesInBackground(
+    waveId: string,
+    options: { sort?: string; sortDirection?: 'ASC' | 'DESC'; pageSize?: number } = {}
+  ): Promise<void> {
+    const { sort = 'RANK', sortDirection = 'ASC', pageSize = 100 } = options;
+    
+    try {
+      const allDrops: any[] = [];
+      let page = 2; // Start from page 2 since page 1 is already loaded
+
+      while (true) {
+        const response = await this.authenticatedRequest(
+          `/api/waves/${waveId}/leaderboard?page_size=${pageSize}&page=${page}&sort=${sort}&sort_direction=${sortDirection}`
+        );
+        const pageDrops = response.drops || [];
+        allDrops.push(...pageDrops);
+
+        if (pageDrops.length < pageSize) {
+          break;
+        }
+
+        page += 1;
+      }
+
+      // Emit event when background loading is complete
+      this.emit('leaderboardUpdated', { drops: allDrops });
+    } catch (error) {
+      console.error('Background leaderboard loading failed:', error);
+    }
   }
 
   /**
@@ -718,7 +776,8 @@ export class SixFiveTwoNineVotingSDK {
    */
   async getVotingData(options: VotingDataOptions = {}): Promise<VotingData> {
     const {
-      waveId = 'b6128077-ea78-4dd9-b381-52c4eadb2077'
+      waveId = 'b6128077-ea78-4dd9-b381-52c4eadb2077',
+      immediate = false
     } = options;
 
     try {
@@ -726,7 +785,7 @@ export class SixFiveTwoNineVotingSDK {
 
       const [userIdentity, leaderboardDrops] = await Promise.all([
         this.getUserIdentity(),
-        this.fetchAllLeaderboardDrops(waveId)
+        this.fetchAllLeaderboardDrops(waveId, { immediate })
       ]);
 
       // Process submissions from leaderboard

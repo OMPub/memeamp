@@ -25,6 +25,18 @@ export function initWallet(walletElements: WalletElements): void {
   checkWalletConnection();
   setupEventListeners();
   
+  // Listen for background leaderboard updates
+  sdk.on('leaderboardUpdated', (data: any) => {
+    if (votingData && data.drops) {
+      // Merge the background-loaded drops with existing data
+      const allDrops = [...votingData.submissions.slice(0, 20), ...data.drops];
+      votingData.submissions = allDrops;
+      
+      // Update the playlist with the full data (but still only show top 20)
+      updatePlaylistWithFullData();
+    }
+  });
+  
   // Add navigation button event listeners
   document.addEventListener('DOMContentLoaded', () => {
     const prevButton = document.getElementById('prevButton');
@@ -376,8 +388,8 @@ async function authenticateWith6529(): Promise<void> {
       return signature;
     });
     
-    // Fetch voting data (includes submissions)
-    votingData = await sdk.getVotingData();
+    // Fetch voting data (includes submissions) - use immediate loading for fast initial display
+    votingData = await sdk.getVotingData({ immediate: true });
     
     // Update identity info display
     updateIdentityInfoDisplay(votingData.user.tdh, votingData.user.availableTDH);
@@ -386,7 +398,7 @@ async function authenticateWith6529(): Promise<void> {
     // Update the UI with submissions immediately
     const playlistContent = document.getElementById('playlistContent');
     if (playlistContent) {
-      currentSubmissions = votingData.submissions.slice(0, 10);
+      currentSubmissions = votingData.submissions.slice(0, 20); // Only show top 20
       currentSubmissionIndex = 0; // Reset to first submission
       
       // Debug: Log the vote counts to verify sorting
@@ -758,6 +770,42 @@ function updateActivePlaylistItem(): void {
       item.classList.remove('active');
     }
   });
+}
+
+// Update playlist with full data when background loading completes
+function updatePlaylistWithFullData(): void {
+  const playlistContent = document.getElementById('playlistContent');
+  if (!playlistContent || !votingData) return;
+  
+  // Update currentSubmissions with top 20 only
+  currentSubmissions = votingData.submissions.slice(0, 20);
+  
+  // Re-render the playlist with top 20 submissions
+  playlistContent.innerHTML = currentSubmissions.map((submission: any, index: number) => {
+    const votes = formatVotes(Math.round(submission.rating_prediction));
+    return `
+      <div class="playlist-item" data-submission-id="${submission.id}">
+        <span class="playlist-rank">${index + 1}.</span>
+        <span class="playlist-text">${submission.title || 'Untitled'} by ${submission.author.handle}</span>
+        <span class="playlist-votes">${votes}</span>
+      </div>
+    `;
+  }).join('');
+  
+  // Re-add click handlers for all playlist items
+  document.querySelectorAll('.playlist-item').forEach((item, index) => {
+    item.addEventListener('click', function(this: HTMLElement) {
+      currentSubmissionIndex = index;
+      const submission = currentSubmissions[index];
+      if (submission) {
+        loadSubmissionIntoVisualizer(submission);
+        updateActivePlaylistItem();
+      }
+    });
+  });
+  
+  // Restore the active item
+  updateActivePlaylistItem();
 }
 
 // Detect content type for URLs without clear extensions

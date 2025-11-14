@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: '/memeamp/',
+  base: './',
   server: {
     port: 6529
   }
