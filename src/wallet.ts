@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import type { WalletState, NetworkMap, WalletElements } from './types';
+import type { WalletState, WalletElements } from './types';
 import SixFiveTwoNineVotingSDK, { type VotingData } from './6529-sdk';
 import { updateMemeampTooltip } from './tooltip';
 
@@ -15,15 +15,6 @@ const sdk = new SixFiveTwoNineVotingSDK();
 let votingData: VotingData | null = null;
 let isRefreshingBoostData = false;
 let lastBoostDataRefresh = 0;
-
-// Network names mapping
-const networks: NetworkMap = {
-  1: 'Ethereum Mainnet',
-  5: 'Goerli Testnet',
-  11155111: 'Sepolia Testnet',
-  137: 'Polygon Mainnet',
-  80001: 'Mumbai Testnet'
-};
 
 // DOM elements
 let elements: WalletElements;
