@@ -4,6 +4,31 @@
   box-sizing: border-box;
 }
 
+/* Memeamp Tooltip */
+.memeamp-tooltip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  padding: 6px 12px;
+  border: none;
+  background: #2a2a2a;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 500;
+  border-radius: 6px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 90ms ease-out, transform 90ms ease-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.memeamp-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   background: url('./assets/memeamp-bg.jpg') center/cover fixed no-repeat, linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -122,6 +147,27 @@ body {
   gap: 4px;
 }
 
+.tdh-loading {
+  color: #00ff00;
+  font-size: 10px;
+  text-align: center;
+  display: block;
+  width: 100%;
+}
+
+.loading-dots::after {
+  content: '';
+  animation: loading-dots 1.5s infinite;
+}
+
+@keyframes loading-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
 .identity-value {
   font-family: 'OCR-B', monospace;
   font-weight: normal;
@@ -168,12 +214,23 @@ body {
   background: transparent;
   overflow: hidden;
   position: relative;
+  padding: 0 48px;
+  box-sizing: border-box;
 }
 
 .visualizer-media {
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
+}
+
+.visualizer-media iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
 }
 
 .visualizer-info {
@@ -432,6 +489,79 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.vote-button {
+  position: absolute;
+  top: 124px;
+  left: 475px;
+  width: 48px;
+  height: 25px;
+  cursor: pointer;
+  z-index: 10;
+  pointer-events: auto;
+  opacity: 0.6;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  border-radius: 2px;
+  transition: all 0.1s ease;
+  box-shadow: none;
+}
+
+.vote-button:hover {
+  background: rgba(200, 200, 200, 0.8);
+}
+
+.vote-button:active {
+  box-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.3) inset,
+    -1px -1px 0 rgba(0, 0, 0, 0.1) inset;
+  transform: translate(1px, 1px);
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(0, 0, 0, 0.4);
+  border-left: 1px solid rgba(0, 0, 0, 0.4);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Submit Button Overlay (next to vote) */
+.submit-button {
+  position: absolute;
+  top: 124px;
+  left: 526px; /* placed to the right of vote-button */
+  width: 45px;
+  height: 25px;
+  cursor: pointer;
+  z-index: 10;
+  pointer-events: auto;
+  opacity: 0.6;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  border-radius: 2px;
+  transition: all 0.1s ease;
+  box-shadow: none;
+}
+
+.submit-button:hover {
+  background: rgba(200, 200, 200, 0.8);
+}
+
+.submit-button:active {
+  box-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.3) inset,
+    -1px -1px 0 rgba(0, 0, 0, 0.1) inset;
+  transform: translate(1px, 1px);
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(0, 0, 0, 0.4);
+  border-left: 1px solid rgba(0, 0, 0, 0.4);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* Action Buttons Under Playlist */
 .action-buttons {
   position: absolute;
@@ -674,12 +804,46 @@ body {
 
 /* Error Message */
 .error-message {
-  background: rgba(239, 68, 68, 0.9);
-  color: white;
-  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.95);
+  color: #00ff00;
+  border: 1px solid rgba(0, 255, 0, 0.2);
+  padding: 0;
   border-radius: 8px;
   font-size: 14px;
   backdrop-filter: blur(10px);
+  position: absolute;
+  top: -40px;
+  left: 80px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.error-message .error-text {
+  display: inline-block;
+  flex: 1;
+}
+
+.error-close {
+  background: transparent;
+  border: none;
+  color: black;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.error-close:hover {
+  opacity: 1;
+  background: rgba(0, 255, 0, 0.1);
+  transform: scale(1.1);
 }
 
 .container {

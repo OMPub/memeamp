@@ -9,6 +9,7 @@ export interface VoteSDKOptions {
   callbacks?: {
     onAuthenticated?: (token: string) => void;
     onVoteSubmitted?: (dropId: string, amount: number) => void;
+    onRepAssigned?: (identity: string, amount: number, category?: string) => void;
     onError?: (error: string) => void;
   };
 }
@@ -17,6 +18,7 @@ export interface Drop {
   id: string;
   serial_no: number;
   author: {
+    id?: string;
     handle: string;
     primary_address: string;
   };
@@ -42,6 +44,15 @@ export interface Vote {
 export interface VoteDistribution {
   drop: Drop;
   voteAmount: number;
+}
+
+export interface RepAssignmentResponse {
+  total_rep_rating_for_category: number;
+  rep_rating_for_category_by_user: number;
+}
+
+export interface RepRatingResponse {
+  rating: number;
 }
 
 export interface UserIdentity {
@@ -98,6 +109,9 @@ export type SDKEvent =
   | 'voting'
   | 'voteSubmitted'
   | 'voteError'
+  | 'repAssigning'
+  | 'repAssigned'
+  | 'repError'
   | 'userDataRefreshed'
   | 'userDataError'
   | 'stateImported';
@@ -114,6 +128,9 @@ export interface SDKEventData {
   voting?: { dropId: string; amount: number };
   voteSubmitted?: { dropId: string; amount: number; response: any };
   voteError?: { dropId: string; amount: number; error: string };
+  repAssigning?: { identity: string; amount: number; category?: string };
+  repAssigned?: { identity: string; amount: number; category?: string; response: RepAssignmentResponse };
+  repError?: { identity: string; amount: number; category?: string; error: string };
   userDataRefreshed?: { user: any; userVotes: Vote[]; userVotesMap: { [key: string]: number } };
   userDataError?: { error: string };
   stateImported?: SDKState;
@@ -240,7 +257,7 @@ export class SixFiveTwoNineVotingSDK {
   /**
    * Make authenticated API requests
    */
-  private async authenticatedRequest(url: string, options: RequestInit = {}): Promise<any> {
+  private async authenticatedRequest(url: string, options: RequestInit = {}, data?: any): Promise<any> {
     if (!this.accessToken) {
       throw new Error('Not authenticated with 6529. Please call authenticate() first.');
     }
@@ -248,19 +265,42 @@ export class SixFiveTwoNineVotingSDK {
     const defaultOptions: RequestInit = {
       headers: {
         'Authorization': `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    };
+
+    // Merge headers properly to avoid overwrites
+    const mergedOptions: RequestInit = {
+      ...defaultOptions,
+      ...options,
+      headers: {
+        ...defaultOptions.headers,
         ...options.headers
       }
     };
 
-    const response = await fetch(`${this.baseURL}${url}`, {
-      ...defaultOptions,
-      ...options
-    });
+    // Add body if data is provided (for POST/PUT requests)
+    if (data !== undefined) {
+      mergedOptions.body = JSON.stringify(data);
+    }
+
+    const response = await fetch(`${this.baseURL}${url}`, mergedOptions);
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+      let errorData: any;
+      try {
+        const errorText = await response.text();
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Unknown error' };
+        }
+      } catch {
+        errorData = { error: 'Unknown error' };
+      }
+      
+      const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -287,13 +327,11 @@ export class SixFiveTwoNineVotingSDK {
       // Response is direct
       nonceData = apiResponse;
     } else {
-      console.error('Invalid nonce response:', apiResponse);
       throw new Error('Invalid response from 6529 API: missing nonce or server_signature');
     }
     
     // Validate nonce data
     if (!nonceData.nonce || !nonceData.server_signature) {
-      console.error('Invalid nonce data:', nonceData);
       throw new Error('Invalid response from 6529 API: missing nonce or server_signature');
     }
     
@@ -422,6 +460,7 @@ export class SixFiveTwoNineVotingSDK {
           id: item.id,
           serial_no: item.serial_no,
           author: {
+            id: item.author?.id,
             handle: item.author.handle,
             primary_address: item.author.primary_address,
           },
@@ -481,6 +520,7 @@ export class SixFiveTwoNineVotingSDK {
           id: item.id,
           serial_no: item.serial_no,
           author: {
+            id: item.author?.id,
             handle: item.author.handle,
             primary_address: item.author.primary_address,
           },
@@ -514,6 +554,31 @@ export class SixFiveTwoNineVotingSDK {
     );
 
     return this.processLeaderboardData(response.drops || []);
+  }
+
+  private async fetchAllLeaderboardDrops(
+    waveId: string,
+    options: { sort?: string; sortDirection?: 'ASC' | 'DESC'; pageSize?: number } = {}
+  ): Promise<any[]> {
+    const { sort = 'RANK', sortDirection = 'ASC', pageSize = 100 } = options;
+    const allDrops: any[] = [];
+    let page = 1;
+
+    while (true) {
+      const response = await this.authenticatedRequest(
+        `/api/waves/${waveId}/leaderboard?page_size=${pageSize}&page=${page}&sort=${sort}&sort_direction=${sortDirection}`
+      );
+      const pageDrops = response.drops || [];
+      allDrops.push(...pageDrops);
+
+      if (pageDrops.length < pageSize) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return allDrops;
   }
 
   /**
@@ -570,13 +635,10 @@ export class SixFiveTwoNineVotingSDK {
     try {
       this.emit('voting', { dropId, amount });
 
+      // Use the same format as the working axios implementation
       const response = await this.authenticatedRequest(`/api/drops/${dropId}/ratings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ rating: amount })
-      });
+        method: 'POST'
+      }, { rating: amount });
 
       this.emit('voteSubmitted', { dropId, amount, response } as any);
       this.callbacks?.onVoteSubmitted?.(dropId, amount);
@@ -590,6 +652,68 @@ export class SixFiveTwoNineVotingSDK {
   }
 
   /**
+   * Assign REP to an identity for a specific category
+   */
+  async assignRep(identity: string, amount: number, category: string): Promise<RepAssignmentResponse> {
+    if (!identity) {
+      throw new Error('Target identity is required to assign REP');
+    }
+
+    if (!category || !category.trim()) {
+      throw new Error('REP category is required');
+    }
+
+    if (!amount || amount === 0) {
+      throw new Error('REP amount must be a non-zero value');
+    }
+
+    try {
+      const trimmedCategory = category.trim();
+      this.emit('repAssigning', { identity, amount, category: trimmedCategory } as any);
+
+      const response = await this.authenticatedRequest(`/api/profiles/${identity}/rep/rating`, {
+        method: 'POST'
+      }, { amount, category: trimmedCategory });
+
+      this.emit('repAssigned', { identity, amount, category: trimmedCategory, response } as any);
+      this.callbacks?.onRepAssigned?.(identity, amount, trimmedCategory);
+
+      return response as RepAssignmentResponse;
+    } catch (error) {
+      this.emit('repError', { identity, amount, category, error: (error as Error).message } as any);
+      this.callbacks?.onError?.((error as Error).message);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieve the REP rating you (or a specified identity) have assigned to a profile/category
+   */
+  async getRepRating(identity: string, category?: string, fromIdentity?: string): Promise<number> {
+    if (!identity) {
+      throw new Error('Target identity is required');
+    }
+
+    const params = new URLSearchParams();
+
+    if (category && category.trim()) {
+      params.set('category', category.trim());
+    }
+
+    const raterIdentity = fromIdentity || this.userAddress || '';
+    if (raterIdentity) {
+      params.set('from_identity', raterIdentity);
+    }
+
+    const query = params.toString();
+    const url = query ? `/api/profiles/${identity}/rep/rating?${query}` : `/api/profiles/${identity}/rep/rating`;
+
+    const response = await this.authenticatedRequest(url);
+    const repResponse = response as RepRatingResponse;
+    return repResponse.rating || 0;
+  }
+
+  /**
    * Get complete voting data (user votes + submissions)
    */
   async getVotingData(options: VotingDataOptions = {}): Promise<VotingData> {
@@ -600,20 +724,19 @@ export class SixFiveTwoNineVotingSDK {
     try {
       this.emit('loadingData', {});
 
-      // Get leaderboard data (contains both submissions and user votes)
-      const leaderboardResponse = await this.authenticatedRequest(`/api/waves/${waveId}/leaderboard?page_size=100&page=1&sort=RANK&sort_direction=ASC`);
-      
-      // Get user identity in parallel
-      const userIdentity = await this.getUserIdentity();
+      const [userIdentity, leaderboardDrops] = await Promise.all([
+        this.getUserIdentity(),
+        this.fetchAllLeaderboardDrops(waveId)
+      ]);
 
       // Process submissions from leaderboard
-      const submissions = this.processLeaderboardData(leaderboardResponse.drops || []);
+      const submissions = this.processLeaderboardData(leaderboardDrops);
       
       // Extract user votes from the same leaderboard data
       const userVotesMap: { [key: string]: number } = {};
       const votes: Vote[] = [];
       
-      (leaderboardResponse.drops || []).forEach((item: any) => {
+      (leaderboardDrops || []).forEach((item: any) => {
         if (item.id && item.context_profile_context?.rating && item.context_profile_context.rating > 0) {
           const voteAmount = item.context_profile_context.rating;
           userVotesMap[item.id] = voteAmount;
@@ -670,16 +793,16 @@ export class SixFiveTwoNineVotingSDK {
   async refreshUserData(): Promise<{ user: any; userVotes: Vote[]; userVotesMap: { [key: string]: number } }> {
     try {
       // Get user identity and extract votes from leaderboard
-      const [userIdentity, leaderboardResponse] = await Promise.all([
+      const [userIdentity, leaderboardDrops] = await Promise.all([
         this.getUserIdentity(),
-        this.authenticatedRequest('/api/waves/b6128077-ea78-4dd9-b381-52c4eadb2077/leaderboard?page_size=100&page=1&sort=RANK&sort_direction=ASC')
+        this.fetchAllLeaderboardDrops('b6128077-ea78-4dd9-b381-52c4eadb2077')
       ]);
 
       // Extract user votes from leaderboard data
       const userVotesMap: { [key: string]: number } = {};
       const votes: Vote[] = [];
       
-      (leaderboardResponse.drops || []).forEach((item: any) => {
+      (leaderboardDrops || []).forEach((item: any) => {
         if (item.id && item.context_profile_context?.rating && item.context_profile_context.rating > 0) {
           const voteAmount = item.context_profile_context.rating;
           userVotesMap[item.id] = voteAmount;

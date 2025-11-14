@@ -16,20 +16,28 @@ import rightBtnClick from './assets/memeamp-buttons/RIGHT_click.png'
 import plusBtnDefault from './assets/memeamp-buttons/PLUS_default.png'
 import plusBtnHover from './assets/memeamp-buttons/PLUS_hover.png'
 import plusBtnClick from './assets/memeamp-buttons/PLUS_click.png'
+import { attachMemeampTooltip, updateMemeampTooltip } from './tooltip'
+
+// Load model-viewer for 3D models
+const modelViewerScript = document.createElement('script')
+modelViewerScript.type = 'module'
+modelViewerScript.src = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.0.1/model-viewer.min.js'
+document.head.appendChild(modelViewerScript)
 
 // Set CSS variables for images
-document.documentElement.style.setProperty('--slider-orange-url', `url(${sliderOrange})`);
-document.documentElement.style.setProperty('--slider-blue-url', `url(${sliderBlue})`);
-document.documentElement.style.setProperty('--connect-wallet-url', `url(${connectWalletImg})`);
-document.documentElement.style.setProperty('--left-btn-default', `url(${leftBtnDefault})`);
-document.documentElement.style.setProperty('--left-btn-hover', `url(${leftBtnHover})`);
-document.documentElement.style.setProperty('--left-btn-click', `url(${leftBtnClick})`);
-document.documentElement.style.setProperty('--right-btn-default', `url(${rightBtnDefault})`);
-document.documentElement.style.setProperty('--right-btn-hover', `url(${rightBtnHover})`);
-document.documentElement.style.setProperty('--right-btn-click', `url(${rightBtnClick})`);
-document.documentElement.style.setProperty('--add-btn-default', `url(${plusBtnDefault})`);
-document.documentElement.style.setProperty('--add-btn-hover', `url(${plusBtnHover})`);
-document.documentElement.style.setProperty('--add-btn-click', `url(${plusBtnClick})`);
+const htmlStyles = document.documentElement.style
+htmlStyles.setProperty('--slider-orange-url', `url(${sliderOrange})`)
+htmlStyles.setProperty('--slider-blue-url', `url(${sliderBlue})`)
+htmlStyles.setProperty('--connect-wallet-url', `url(${connectWalletImg})`)
+htmlStyles.setProperty('--left-btn-default', `url(${leftBtnDefault})`)
+htmlStyles.setProperty('--left-btn-hover', `url(${leftBtnHover})`)
+htmlStyles.setProperty('--left-btn-click', `url(${leftBtnClick})`)
+htmlStyles.setProperty('--right-btn-default', `url(${rightBtnDefault})`)
+htmlStyles.setProperty('--right-btn-hover', `url(${rightBtnHover})`)
+htmlStyles.setProperty('--right-btn-click', `url(${rightBtnClick})`)
+htmlStyles.setProperty('--add-btn-default', `url(${plusBtnDefault})`)
+htmlStyles.setProperty('--add-btn-hover', `url(${plusBtnHover})`)
+htmlStyles.setProperty('--add-btn-click', `url(${plusBtnClick})`)
 
 // Create the app HTML structure
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
@@ -69,31 +77,31 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <div class="playlist-section">
         <div id="playlistContent" class="playlist-content">
           <div class="playlist-placeholder">
-            <button id="connectButton" class="connect-btn-img"></button>
+            <button id="connectButton" class="connect-btn-img" aria-label="Connect Wallet"></button>
           </div>
         </div>
       </div>
       
       <!-- Navigation Buttons -->
       <div class="nav-buttons">
-        <button id="prevButton" class="nav-btn prev-btn" title="PREV"></button>
-        <button id="addButton" class="nav-btn add-btn" title="BOOST: Instantly add 10% of available TDH"></button>
-        <button id="nextButton" class="nav-btn next-btn" title="NEXT"></button>
+        <button id="prevButton" class="nav-btn prev-btn" aria-label="Previous Meme"></button>
+        <button id="addButton" class="nav-btn add-btn" aria-label="Boost Current Meme"></button>
+        <button id="nextButton" class="nav-btn next-btn" aria-label="Next Meme"></button>
         
         <!-- MY WAVES Clickable Area -->
-        <button id="myWavesButton" class="my-waves-button" title="Load My Waves"></button>
+        <button id="myWavesButton" class="my-waves-button" aria-label="Load My Waves"></button>
       </div>
       
       <!-- Action Buttons Under Playlist -->
       <div class="action-buttons">
-        <a href="https://6529.io/" target="_blank" class="action-btn" title="!Seize"></a>
-        <a href="https://6529.io/nextgen/collections" target="_blank" class="action-btn" title="Next Gen RPT"></a>
-        <a href="https://x.com/search?q=from%3Apunk6529%20Whitepaper&src=typed_query" target="_blank" class="action-btn" title="RPT Whitepaper"></a>
-        <a href="https://medium.com/@brunopgalvao/substrate-cfeb13333f2c" target="_blank" class="action-btn" title="Make Blkchn"></a>
+        <a href="https://6529.io/" target="_blank" class="action-btn" aria-label="!Seize"></a>
+        <a href="https://6529.io/nextgen/collections" target="_blank" class="action-btn" aria-label="Next Gen RPT"></a>
+        <a href="https://x.com/search?q=from%3Apunk6529%20Whitepaper&src=typed_query" target="_blank" class="action-btn" aria-label="RPT Whitepaper"></a>
+        <a href="https://medium.com/@brunopgalvao/substrate-cfeb13333f2c" target="_blank" class="action-btn" aria-label="Make Blkchn"></a>
       </div>
       
       <!-- Post Thread Button -->
-      <a href="https://x.com/compose/post?text=Stream the memes on https://memeamp.com by @mintfaced" target="_blank" class="post-thread-btn" title="Post Thread"></a>
+      <a href="https://x.com/compose/post?text=Stream the memes on https://memeamp.com by @mintfaced" target="_blank" class="post-thread-btn" aria-label="Post Thread"></a>
       
       <!-- Slider Controls -->
       <div class="slider-controls">
@@ -105,15 +113,27 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <div class="slider-track"></div>
           <div class="slider-handle blue" id="slider2" style="left: 60%"></div>
         </div>
+        
+        <!-- VOTE Button - Transparent Overlay -->
+        <button id="voteButton" class="vote-button" aria-label="Vote Current Meme"></button>
+        <!-- SUBMIT Button - Transparent Overlay -->
+        <button id="submitButton" class="submit-button" aria-label="Submit Vote"></button>
       </div>
       
       <!-- Player Controls Overlay -->
       <div class="player-controls">
         <!-- Invisible disconnect button overlay on top-right X -->
-        <button id="disconnectButton" class="skin-x-button" title="Disconnect Wallet"></button>
+        <button id="disconnectButton" class="skin-x-button" aria-label="Disconnect Wallet"></button>
         
         <!-- Error Display -->
-        <div id="errorMessage" class="error-message hidden"></div>
+        <div id="errorMessage" class="error-message hidden">
+          <button id="errorClose" class="error-close" aria-label="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M30 10L10 30M10 10L30 30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <span class="error-text"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -134,33 +154,135 @@ initWallet(walletElements)
 
 // Initialize slider drag functionality
 function initSliders() {
-  const sliders = document.querySelectorAll('.slider-handle');
+  const sliders = document.querySelectorAll('.slider-handle')
   
   sliders.forEach(slider => {
-    let isDragging = false;
-    let container: HTMLElement | null = null;
+    let isDragging = false
+    let container: HTMLElement | null = null
     
     slider.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      container = (slider as HTMLElement).closest('.slider-container');
-      e.preventDefault();
-    });
+      isDragging = true
+      container = (slider as HTMLElement).closest('.slider-container')
+      e.preventDefault()
+    })
     
     document.addEventListener('mousemove', (e) => {
-      if (!isDragging || !container) return;
+      if (!isDragging || !container) return
       
-      const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+      const rect = container.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100))
       
-      (slider as HTMLElement).style.left = `${percentage}%`;
-    });
+      ;(slider as HTMLElement).style.left = `${percentage}%`
+      
+      // If this is the TDH slider (slider2), update the TDH display
+      if ((slider as HTMLElement).id === 'slider2') {
+        updateTDHFromSlider(percentage)
+      }
+    })
     
     document.addEventListener('mouseup', () => {
-      isDragging = false;
-      container = null;
-    });
-  });
+      isDragging = false
+      container = null
+    })
+  })
+}
+
+// Update TDH display based on slider position
+function updateTDHFromSlider(percentage: number): void {
+  // Get current voting data from window (shared with wallet.ts)
+  const votingData = (window as any).votingData
+  if (!votingData || !votingData.user) return
+  
+  const availableTDH = votingData.user.availableTDH || 0
+  const currentAssignment = (window as any).currentAssignedTDH || 0
+  const maxTDH = currentAssignment + availableTDH
+  
+  // Calculate new TDH assignment based on slider position
+  const newAssignment = Math.round((percentage / 100) * maxTDH)
+  
+  // Format TDH amount for display (compact) and tooltip (full number)
+  const formattedTDH = formatCompactTDH(newAssignment)
+  const tooltipText = `${newAssignment.toLocaleString()} TDH assigned`
+  
+  // Update the TDH display in the identity window (compact format)
+  const identityTdh = document.getElementById('identityTdh')
+  if (identityTdh) {
+    identityTdh.textContent = formattedTDH
+  }
+  
+  // Update the tooltip with full number
+  const tdhSlider = document.getElementById('slider2') as HTMLElement
+  if (tdhSlider) {
+    updateMemeampTooltip(tdhSlider, tooltipText)
+  }
+  
+  // Store the new assignment for submission
+  (window as any).pendingTDHAssignment = newAssignment
+}
+
+// Format TDH amount to compact notation (max 4 characters)
+function formatCompactTDH(amount: number): string {
+  if (amount >= 1000000) {
+    return (amount / 1000000).toFixed(2) + 'M' // e.g., 2.11M
+  } else if (amount >= 1000) {
+    return (amount / 1000).toFixed(0) + 'K' // e.g., 133K
+  } else {
+    return amount.toString() // e.g., 999
+  }
 }
 
 initSliders()
+
+type TooltipTarget = {
+  selector: string
+  text: string
+}
+
+const tooltipTargets: TooltipTarget[] = [
+  { selector: '#prevButton', text: 'PREV' },
+  { selector: '#addButton', text: 'BOOST: Need at least 1 TDH available' },
+  { selector: '#nextButton', text: 'NEXT' },
+  { selector: '#myWavesButton', text: 'Load My Waves' },
+  { selector: '#disconnectButton', text: 'Disconnect Wallet' },
+]
+
+const actionButtonLabels = ['!Seize', 'Next Gen RPT', 'RPT Whitepaper', 'Make Blkchn']
+
+function initTooltips(): void {
+  tooltipTargets.forEach(({ selector, text }) => {
+    const target = document.querySelector<HTMLElement>(selector)
+    if (!target) return
+    attachMemeampTooltip(target, text)
+  })
+
+  document.querySelectorAll<HTMLAnchorElement>('.action-btn').forEach((el, index) => {
+    const label = actionButtonLabels[index] ?? el.getAttribute('aria-label') ?? 'Action'
+    attachMemeampTooltip(el, label)
+  })
+
+  const postThreadLink = document.querySelector<HTMLAnchorElement>('.post-thread-btn')
+  if (postThreadLink) {
+    attachMemeampTooltip(postThreadLink, 'Post Thread')
+  }
+  
+  // Initialize TDH slider tooltip
+  const tdhSlider = document.getElementById('slider2') as HTMLElement
+  if (tdhSlider) {
+    attachMemeampTooltip(tdhSlider, '0 TDH assigned')
+  }
+  
+  // Initialize vote button tooltip
+  const voteButton = document.getElementById('voteButton') as HTMLElement
+  if (voteButton) {
+    attachMemeampTooltip(voteButton, 'VOTE: Submit TDH assignment')
+  }
+
+  // Initialize submit button tooltip
+  const submitButton = document.getElementById('submitButton') as HTMLElement
+  if (submitButton) {
+    attachMemeampTooltip(submitButton, 'SUBMIT: Confirm vote')
+  }
+}
+
+initTooltips()
