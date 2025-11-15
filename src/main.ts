@@ -16,9 +16,9 @@ import rightBtnClick from './assets/memeamp-buttons/RIGHT_click.png'
 import plusBtnDefault from './assets/memeamp-buttons/PLUS_default.png'
 import plusBtnHover from './assets/memeamp-buttons/PLUS_hover.png'
 import plusBtnClick from './assets/memeamp-buttons/PLUS_click.png'
+import repButtonImg from './assets/rep.png'
 import { attachMemeampTooltip, updateMemeampTooltip } from './tooltip'
 
-// Load model-viewer for 3D models
 const modelViewerScript = document.createElement('script')
 modelViewerScript.type = 'module'
 modelViewerScript.src = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.0.1/model-viewer.min.js'
@@ -38,6 +38,7 @@ htmlStyles.setProperty('--right-btn-click', `url(${rightBtnClick})`)
 htmlStyles.setProperty('--add-btn-default', `url(${plusBtnDefault})`)
 htmlStyles.setProperty('--add-btn-hover', `url(${plusBtnHover})`)
 htmlStyles.setProperty('--add-btn-click', `url(${plusBtnClick})`)
+htmlStyles.setProperty('--rep-btn-image', `url(${repButtonImg})`)
 
 // Create the app HTML structure
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
@@ -114,6 +115,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <div class="slider-handle blue" id="slider2" style="left: 60%"></div>
         </div>
         
+        <!-- REP Button - Transparent Overlay (appears when REP is ready to assign) -->
+        <button id="repButton" class="rep-button" aria-label="Assign REP"></button>
         <!-- VOTE Button - Transparent Overlay -->
         <button id="voteButton" class="vote-button" aria-label="Vote Current Meme"></button>
         <!-- SUBMIT Button - Transparent Overlay -->
@@ -175,9 +178,18 @@ function initSliders() {
       
       ;(slider as HTMLElement).style.left = `${percentage}%`
       
-      // If this is the TDH slider (slider2), update the TDH display
-      if ((slider as HTMLElement).id === 'slider2') {
+      const sliderId = (slider as HTMLElement).id
+      if (sliderId === 'slider2') {
         updateTDHFromSlider(percentage)
+        const repReset = (window as any).resetRepButtonState
+        if (typeof repReset === 'function') {
+          repReset()
+        }
+      } else if (sliderId === 'slider1') {
+        const repHandler = (window as any).handleRepSliderInput
+        if (typeof repHandler === 'function') {
+          repHandler(percentage)
+        }
       }
     })
     
@@ -199,11 +211,12 @@ function updateTDHFromSlider(percentage: number): void {
   const maxTDH = currentAssignment + availableTDH
   
   // Calculate new TDH assignment based on slider position
-  const newAssignment = Math.round((percentage / 100) * maxTDH)
+  const rawAssignment = Math.round((percentage / 100) * maxTDH)
+  const newAssignment = normalizeTDHToPattern(rawAssignment, maxTDH)
   
   // Format TDH amount for display (compact) and tooltip (full number)
   const formattedTDH = formatCompactTDH(newAssignment)
-  const tooltipText = `${newAssignment.toLocaleString()} TDH assigned`
+  const tooltipText = `${newAssignment.toLocaleString()} TDH selected`
   
   // Update the TDH display in the identity window (compact format)
   const identityTdh = document.getElementById('identityTdh')
@@ -232,6 +245,50 @@ function formatCompactTDH(amount: number): string {
   }
 }
 
+function normalizeTDHToPattern(requested: number, max: number): number {
+  if (!Number.isFinite(requested) || !Number.isFinite(max)) return 0
+
+  let maxInt = Math.max(0, Math.floor(max))
+  let reqInt = Math.max(0, Math.round(requested))
+
+  if (maxInt === 0) return 0
+  if (reqInt > maxInt) reqInt = maxInt
+
+  // Only apply pattern for 5+ digit values
+  if (reqInt < 10000 || maxInt < 10000) {
+    return reqInt
+  }
+
+  const base = Math.floor(reqInt / 10000)
+
+  // Candidate below or equal to requested
+  let down = base * 10000 + 4753
+  if (down > reqInt) {
+    down = (base - 1) * 10000 + 4753
+  }
+  if (down < 10000 || down > maxInt) {
+    down = NaN as any
+  }
+
+  // Candidate above or equal to requested
+  let upBase = base
+  if (!Number.isNaN(down) && down < reqInt) {
+    upBase = base + 1
+  }
+  let up = upBase * 10000 + 4753
+  if (up < 10000 || up > maxInt) {
+    up = NaN as any
+  }
+
+  if (Number.isNaN(down) && Number.isNaN(up)) {
+    return reqInt
+  }
+  if (Number.isNaN(down)) return up
+  if (Number.isNaN(up)) return down
+
+  return Math.abs(up - reqInt) < Math.abs(reqInt - down) ? up : down
+}
+
 initSliders()
 
 type TooltipTarget = {
@@ -244,6 +301,7 @@ const tooltipTargets: TooltipTarget[] = [
   { selector: '#addButton', text: 'BOOST: Need at least 1 TDH available' },
   { selector: '#nextButton', text: 'NEXT' },
   { selector: '#myWavesButton', text: 'Load My Waves' },
+  { selector: '#repButton', text: 'REP: Assign to artist' },
   { selector: '#disconnectButton', text: 'Disconnect Wallet' },
 ]
 
@@ -269,19 +327,34 @@ function initTooltips(): void {
   // Initialize TDH slider tooltip
   const tdhSlider = document.getElementById('slider2') as HTMLElement
   if (tdhSlider) {
-    attachMemeampTooltip(tdhSlider, '0 TDH assigned')
+    attachMemeampTooltip(tdhSlider, '0 TDH selected')
   }
-  
+
+  const repSlider = document.getElementById('slider1') as HTMLElement
+  if (repSlider) {
+    const repTooltip = (window as any).formatRepTooltip
+    if (typeof repTooltip === 'function') {
+      attachMemeampTooltip(repSlider, repTooltip(0))
+    } else {
+      attachMemeampTooltip(repSlider, '0 REP → this meme')
+    }
+  }
+
   // Initialize vote button tooltip
   const voteButton = document.getElementById('voteButton') as HTMLElement
   if (voteButton) {
-    attachMemeampTooltip(voteButton, 'VOTE: Submit TDH assignment')
+    attachMemeampTooltip(voteButton, 'VOTE: Submit TDH selection')
   }
 
   // Initialize submit button tooltip
   const submitButton = document.getElementById('submitButton') as HTMLElement
   if (submitButton) {
     attachMemeampTooltip(submitButton, 'SUBMIT: Confirm vote')
+  }
+
+  const repButton = document.getElementById('repButton') as HTMLElement
+  if (repButton) {
+    attachMemeampTooltip(repButton, 'Assign REP to this artist')
   }
 }
 

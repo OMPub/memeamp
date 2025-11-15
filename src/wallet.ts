@@ -3,15 +3,92 @@ import type { WalletState, WalletElements } from './types';
 import SixFiveTwoNineVotingSDK, { type VotingData } from './6529-sdk';
 import { updateMemeampTooltip } from './tooltip';
 
+function render3DModel(container: HTMLElement, url: string, submission: any): void {
+  container.innerHTML = '';
+  const modelViewer = document.createElement('model-viewer');
+  modelViewer.setAttribute('src', url);
+  modelViewer.setAttribute('alt', submission.title || '3D Model');
+  modelViewer.classList.add('visualizer-media');
+  modelViewer.setAttribute('auto-rotate', '');
+  modelViewer.setAttribute('camera-controls', '');
+  modelViewer.setAttribute('shadow-intensity', '1');
+
+  const handleModelError = (error?: Event) => {
+    console.warn('model-viewer failed, falling back to static preview', error);
+    renderModelFallback(container, url);
+  };
+
+  modelViewer.addEventListener('error', handleModelError, { once: true });
+  modelViewer.addEventListener('webglcontextlost', handleModelError, { once: true });
+  container.appendChild(modelViewer);
+}
+
+function renderModelFallback(container: HTMLElement, url: string): void {
+  const guidance = getWebGLGuidance();
+  container.innerHTML = `
+    <div class="visualizer-fallback">
+      <p>WebGL unavailable. <a href="${url}" target="_blank" rel="noopener noreferrer">Open model</a></p>
+      ${guidance ? `<p class="visualizer-fallback-help">${guidance}</p>` : ''}
+    </div>
+  `;
+}
+
+function getWebGLGuidance(): string {
+  if (typeof navigator === 'undefined') return '';
+  const ua = navigator.userAgent.toLowerCase();
+
+  if (ua.includes('brave')) {
+    return 'In Brave: open <a href="brave://settings/system">brave://settings/system</a> and enable "Use hardware acceleration when available", then restart Brave.';
+  }
+  if (ua.includes('edg/')) {
+    return 'In Edge: open <a href="edge://settings/system">edge://settings/system</a> and enable "Use hardware acceleration when available", then restart Edge.';
+  }
+  if (ua.includes('chrome') || ua.includes('crios')) {
+    return 'In Chrome: open <a href="chrome://settings/system">chrome://settings/system</a> and enable "Use hardware acceleration when available", then restart Chrome.';
+  }
+  if (ua.includes('firefox')) {
+    return 'In Firefox: open <a href="about:preferences#general">about:preferences#general</a>, enable "Use recommended performance settings" and "Use hardware acceleration when available", then restart Firefox.';
+  }
+  if (ua.includes('safari') && ua.includes('mac os')) {
+    return 'In Safari on macOS: ensure "WebGL" and "Hardware acceleration" are enabled in the Develop menu and system settings, then quit and reopen Safari.';
+  }
+  return 'To view 3D here, enable hardware acceleration/WebGL in your browser settings and restart your browser.';
+}
+
 // State management
 let provider: ethers.BrowserProvider | null = null;
 let signer: ethers.JsonRpcSigner | null = null;
 let userAddress: string | null = null;
 let currentSubmissionIndex: number = 0;
 let currentSubmissions: any[] = [];
+let currentRepAssignment = 0; // slider baseline (>=0)
+let currentRepTotalAssigned = 0; // signed total from server
+let pendingRepAssignment = 0;
+let availableRepCredit = 0;
+let currentRepCategory = '';
+let currentRepArtistHandle = '';
+let repSliderMax = 0;
+let repDataRequestId = 0;
+
+const apiBaseURL = import.meta.env.DEV ? '/api-6529' : 'https://api.6529.io';
+
+// BOOST emoji set with geometric falloff: first is most common
+const BOOST_EMOJI = ['⚡️', '🍒', '🎸', '❤️', '🔥', '🚀', '🥁', '🎶', '😍', '🥰', '🎵', '🎤', '👏'];
+const BOOST_EMOJI_CDF: number[] = (() => {
+  const r = 0.7;
+  const weights = BOOST_EMOJI.map((_, i) => Math.pow(r, i));
+  const sum = weights.reduce((acc, w) => acc + w, 0);
+  let acc = 0;
+  return weights.map(w => {
+    acc += w / sum;
+    return acc;
+  });
+})();
+
+let boostUsageCount = 0;
 
 // 6529 SDK
-const sdk = new SixFiveTwoNineVotingSDK();
+const sdk = new SixFiveTwoNineVotingSDK({ baseURL: apiBaseURL });
 let votingData: VotingData | null = null;
 let isRefreshingBoostData = false;
 let lastBoostDataRefresh = 0;
@@ -87,6 +164,73 @@ export function initWallet(walletElements: WalletElements): void {
         });
       });
     }
+
+    const repButton = document.getElementById('repButton');
+    if (repButton) {
+      repButton.addEventListener('click', () => {
+        assignRepToCurrentSubmission().catch(() => {
+          console.error('REP assignment failed');
+        });
+      });
+    }
+
+    // Keyboard controls: arrows for navigation, space/enter for boost
+    document.addEventListener('keydown', (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName;
+      const isEditable =
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        (target && target.isContentEditable);
+
+      if (isEditable) return;
+
+      const key = event.key;
+      const lower = key.toLowerCase();
+
+      if (key === 'ArrowRight' || key === 'ArrowDown' || lower === 'd' || lower === 's') {
+        event.preventDefault();
+        if (nextButton) {
+          nextButton.classList.add('key-active');
+        }
+        showNextSubmission();
+      } else if (key === 'ArrowLeft' || key === 'ArrowUp' || lower === 'a' || lower === 'w') {
+        event.preventDefault();
+        if (prevButton) {
+          prevButton.classList.add('key-active');
+        }
+        showPreviousSubmission();
+      } else if (key === 'Enter' || key === ' ') {
+        event.preventDefault();
+        if (addButton) {
+          addButton.classList.add('key-active');
+        }
+        if (!event.repeat) {
+          boostCurrentSubmission().catch(() => {
+            console.error('Boost action failed');
+          });
+        }
+      }
+    });
+
+    document.addEventListener('keyup', (event: KeyboardEvent) => {
+      const key = event.key;
+      const lower = key.toLowerCase();
+
+      if (key === 'ArrowRight' || key === 'ArrowDown' || lower === 'd' || lower === 's') {
+        if (nextButton) {
+          nextButton.classList.remove('key-active');
+        }
+      } else if (key === 'ArrowLeft' || key === 'ArrowUp' || lower === 'a' || lower === 'w') {
+        if (prevButton) {
+          prevButton.classList.remove('key-active');
+        }
+      } else if (key === 'Enter' || key === ' ') {
+        if (addButton) {
+          addButton.classList.remove('key-active');
+        }
+      }
+    });
 
     // Dismissible error toast close button
     const errorClose = document.getElementById('errorClose');
@@ -324,15 +468,17 @@ function formatAddress(address: string): string {
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
 
-// Show loading state in TDH window
-function showTdhLoading(message: string = 'SUBMITTING'): void {
-  const identityTdh = document.getElementById('identityTdh');
-  if (identityTdh) {
-    identityTdh.innerHTML = `<span class="tdh-loading">${message}<span class="loading-dots"></span></span>`;
+function setMemeLoading(elementId: string, message: string = '..'): void {
+  const target = document.getElementById(elementId);
+  if (target) {
+    target.innerHTML = `<span class="tdh-loading">${message}<span class="loading-dots"></span></span>`;
   }
 }
 
-// Restore TDH display
+function showTdhLoading(message: string = '..'): void {
+  setMemeLoading('identityTdh', message);
+}
+
 function restoreTdhDisplay(): void {
   const pendingTDH = (window as any).pendingTDHAssignment || 0;
   const identityTdh = document.getElementById('identityTdh');
@@ -392,7 +538,7 @@ async function authenticateWith6529(): Promise<void> {
     votingData = await sdk.getVotingData({ immediate: true });
     
     // Update identity info display
-    updateIdentityInfoDisplay(votingData.user.tdh, votingData.user.availableTDH);
+    updateIdentityInfoDisplay(votingData.user.tdh, currentRepAssignment);
     updateBoostTooltip();
     
     // Update the UI with submissions immediately
@@ -454,6 +600,9 @@ function formatVotes(votes: number): string {
 // Load submission into the visualizer area
 // Format number with K/M/B suffixes (3 significant figures)
 function formatNumber(num: number): string {
+  if (num === 0) {
+    return '0';
+  }
   if (num >= 1000000000) {
     return (num / 1000000000).toPrecision(3) + 'B';
   } else if (num >= 1000000) {
@@ -465,7 +614,7 @@ function formatNumber(num: number): string {
 }
 
 // Update identity info display
-function updateIdentityInfoDisplay(tdh: number, rep: number): void {
+function updateIdentityInfoDisplay(tdh: number, rep?: number): void {
   const tdhElement = document.getElementById('identityTdh');
   const repElement = document.getElementById('identityRep');
   
@@ -474,8 +623,260 @@ function updateIdentityInfoDisplay(tdh: number, rep: number): void {
     tdhElement.textContent = formatNumber(tdh);
   }
   
-  if (repElement) {
-    repElement.textContent = formatNumber(rep);
+  if (repElement && rep !== undefined) {
+    repElement.textContent = formatRepDisplay(rep);
+  }
+}
+
+function formatRepDisplay(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  if (abs >= 1_000_000_000) {
+    return `${sign}${(abs / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (abs >= 1_000_000) {
+    return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+  }
+  if (abs >= 1_000) {
+    const precision = abs >= 10_000 ? 0 : 1;
+    return `${sign}${(abs / 1_000).toFixed(precision)}K`;
+  }
+  return `${sign}${abs.toFixed(0)}`;
+}
+
+function normalizeTDHToPattern(requested: number, max: number): number {
+  if (!Number.isFinite(requested) || !Number.isFinite(max)) return 0;
+
+  let maxInt = Math.max(0, Math.floor(max));
+  let reqInt = Math.max(0, Math.round(requested));
+
+  if (maxInt === 0) return 0;
+  if (reqInt > maxInt) reqInt = maxInt;
+
+  // Only apply pattern for 5+ digit values
+  if (reqInt < 10000 || maxInt < 10000) {
+    return reqInt;
+  }
+
+  const base = Math.floor(reqInt / 10000);
+
+  // Candidate below or equal to requested
+  let down = base * 10000 + 4753;
+  if (down > reqInt) {
+    down = (base - 1) * 10000 + 4753;
+  }
+  if (down < 10000 || down > maxInt) {
+    down = NaN as any;
+  }
+
+  // Candidate above or equal to requested
+  let upBase = base;
+  if (!Number.isNaN(down) && down < reqInt) {
+    upBase = base + 1;
+  }
+  let up = upBase * 10000 + 4753;
+  if (up < 10000 || up > maxInt) {
+    up = NaN as any;
+  }
+
+  if (Number.isNaN(down) && Number.isNaN(up)) {
+    return reqInt;
+  }
+  if (Number.isNaN(down)) return up;
+  if (Number.isNaN(up)) return down;
+
+  return Math.abs(up - reqInt) < Math.abs(reqInt - down) ? up : down;
+}
+
+type EmojiParticle = {
+  el: HTMLSpanElement;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  rotation: number;
+  vr: number;
+  createdAt: number;
+  lifeMs: number;
+};
+
+let emojiParticles: EmojiParticle[] = [];
+let emojiAnimationFrameId: number | null = null;
+let lastEmojiFrameTime = 0;
+
+function sampleEmojiLifetimeMs(): number {
+  const mean = 21000; // 21 seconds
+  const stdDev = 6000; // spread around the mean
+  let u1 = Math.random();
+  let u2 = Math.random();
+  if (u1 < 1e-6) u1 = 1e-6;
+  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  let ms = mean + z0 * stdDev;
+  const min = 12000; // 12 seconds
+  const max = 90000; // 90 seconds
+  if (ms < min) ms = min;
+  if (ms > max) ms = max;
+  return ms;
+}
+
+function pickBoostEmoji(): string {
+  const u = Math.random();
+  for (let i = 0; i < BOOST_EMOJI_CDF.length; i++) {
+    if (u <= BOOST_EMOJI_CDF[i]) return BOOST_EMOJI[i];
+  }
+  return BOOST_EMOJI[BOOST_EMOJI.length - 1];
+}
+
+function triggerBoostEmojiExplosion(): void {
+  const player = document.querySelector('.player-skin') as HTMLElement | null;
+  if (!player) return;
+
+  const wave = document.querySelector('.wave-visualizer') as HTMLElement | null;
+  const playerRect = player.getBoundingClientRect();
+  let originX = playerRect.width / 2;
+  let originY = playerRect.height * 0.15;
+
+  if (wave) {
+    const waveRect = wave.getBoundingClientRect();
+    originX = waveRect.left + waveRect.width / 2 - playerRect.left;
+    originY = waveRect.top + waveRect.height / 2 - playerRect.top;
+  }
+
+  boostUsageCount += 1;
+  const baseCount = 18;
+  const extra = Math.min(100, boostUsageCount * 5);
+  const count = baseCount + extra;
+
+  const now = performance.now();
+
+  for (let i = 0; i < count; i++) {
+    const span = document.createElement('span');
+    span.className = 'emoji-particle';
+    span.textContent = pickBoostEmoji();
+    player.appendChild(span);
+
+    const angleSpread = Math.PI / 2; // 90deg cone
+    const angleCenter = -Math.PI / 2; // straight up
+    const angle = angleCenter + (Math.random() - 0.5) * angleSpread * 2;
+    const speed = 320 + Math.random() * 260;
+
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+
+    const rotation = Math.random() * 360;
+    const vr = (Math.random() - 0.5) * 360; // deg/sec
+
+    emojiParticles.push({
+      el: span,
+      x: originX + (Math.random() - 0.5) * 24,
+      y: originY + (Math.random() - 0.5) * 12,
+      vx,
+      vy,
+      rotation,
+      vr,
+      createdAt: now,
+      lifeMs: sampleEmojiLifetimeMs(),
+    });
+  }
+
+  if (!emojiAnimationFrameId) {
+    lastEmojiFrameTime = 0;
+    emojiAnimationFrameId = requestAnimationFrame(stepEmojiParticles);
+  }
+}
+
+function stepEmojiParticles(timestamp: number): void {
+  const player = document.querySelector('.player-skin') as HTMLElement | null;
+  if (!player) {
+    emojiParticles.forEach(p => p.el.remove());
+    emojiParticles = [];
+    emojiAnimationFrameId = null;
+    lastEmojiFrameTime = 0;
+    return;
+  }
+
+  if (!lastEmojiFrameTime) {
+    lastEmojiFrameTime = timestamp;
+  }
+  const dt = (timestamp - lastEmojiFrameTime) / 1000;
+  lastEmojiFrameTime = timestamp;
+
+  const rect = player.getBoundingClientRect();
+  const width = rect.width - 30; // shrink by 30px to avoid edge collisions
+  const height = rect.height;
+  const radius = 34; // approximate half of 69px emoji size
+  const sideMargin = 6; // keep particles slightly inside left/right edges
+  const visualizer = player.querySelector('.visualizer-area') as HTMLElement | null;
+  let floor = height - radius;
+  if (visualizer) {
+    const vRect = visualizer.getBoundingClientRect();
+    // Convert visualizer bottom to player-local coordinates and subtract radius
+    const localBottom = vRect.bottom - rect.top - radius;
+    // Clamp so floor stays within player box
+    floor = Math.max(radius, Math.min(height - radius, localBottom));
+  }
+  const gravity = 900; // px/s^2
+  const wallDamping = 0.8;
+  const floorDamping = 0.7;
+
+  const nextParticles: EmojiParticle[] = [];
+
+  for (const p of emojiParticles) {
+    const ageMs = timestamp - p.createdAt;
+    if (ageMs > p.lifeMs) {
+      p.el.remove();
+      continue;
+    }
+
+    p.vy += gravity * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.rotation += p.vr * dt;
+
+    if (p.x < radius + sideMargin) {
+      p.x = radius + sideMargin;
+      p.vx *= -wallDamping;
+    } else if (p.x > width - radius - sideMargin) {
+      p.x = width - radius - sideMargin;
+      p.vx *= -wallDamping;
+    }
+
+    if (p.y > floor) {
+      p.y = floor;
+      p.vy *= -floorDamping;
+      p.vx *= 0.85;
+    }
+
+    // Once particles are effectively settled near the floor, ease their spin down
+    const nearFloor = p.y >= floor - 1 && Math.abs(p.vy) < 40;
+    if (nearFloor) {
+      const spinDamp = Math.max(0, 1 - 3 * dt); // strong damping when settled
+      p.vr *= spinDamp;
+    }
+
+    const lifeT = ageMs / p.lifeMs;
+    const remainingMs = Math.max(0, p.lifeMs - ageMs);
+    let opacity = 1;
+    if (remainingMs <= 6000) {
+      const fadeT = remainingMs / 6000; // 1 -> 0 over last 6s
+      opacity = fadeT;
+    }
+    const scale = 0.9 + lifeT * 0.4;
+
+    p.el.style.opacity = opacity.toFixed(2);
+    p.el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) rotate(${p.rotation.toFixed(1)}deg) scale(${scale.toFixed(2)})`;
+
+    nextParticles.push(p);
+  }
+
+  emojiParticles = nextParticles;
+
+  if (emojiParticles.length > 0) {
+    emojiAnimationFrameId = requestAnimationFrame(stepEmojiParticles);
+  } else {
+    emojiAnimationFrameId = null;
+    lastEmojiFrameTime = 0;
   }
 }
 
@@ -502,7 +903,23 @@ function updateBoostTooltip(): void {
   if (!addButton) return;
 
   const availableTDH = votingData?.user?.availableTDH ?? 0;
-  const boostAmount = calculateBoostAmount(availableTDH);
+  let boostAmount = 0;
+
+  if (votingData && currentSubmissions.length > 0) {
+    const submission = currentSubmissions[currentSubmissionIndex];
+    if (submission) {
+      const currentTDH = votingData.userVotesMap?.[submission.id] || 0;
+      const maxTDH = currentTDH + availableTDH;
+      const rawBoost = calculateBoostAmount(availableTDH);
+      const requestedTotal = currentTDH + rawBoost;
+      const normalizedTotal = normalizeTDHToPattern(requestedTotal, maxTDH);
+      boostAmount = Math.max(0, normalizedTotal - currentTDH);
+    } else {
+      boostAmount = calculateBoostAmount(availableTDH);
+    }
+  } else {
+    boostAmount = calculateBoostAmount(availableTDH);
+  }
 
   if (boostAmount > 0) {
     updateMemeampTooltip(addButton, `BOOST: Instantly upvote ${boostAmount.toLocaleString()} MOAR TDH`);
@@ -554,7 +971,26 @@ async function boostCurrentSubmission(): Promise<void> {
     return;
   }
 
-  const newTotalTDH = currentTDH + boostAmount;
+  const maxTDH = currentTDH + availableTDH;
+  const requestedTotal = currentTDH + boostAmount;
+  const normalizedTotal = normalizeTDHToPattern(requestedTotal, maxTDH);
+  const normalizedBoostAmount = normalizedTotal - currentTDH;
+
+  if (normalizedBoostAmount < 1) {
+    restoreTdhDisplay();
+    if (addButton) {
+      addButton.disabled = false;
+    }
+    showError('Need at least 1 available TDH to boost.');
+    updateBoostTooltip();
+    return;
+  }
+
+  boostAmount = normalizedBoostAmount;
+  const newTotalTDH = normalizedTotal;
+
+  // Visual BOOST effect
+  triggerBoostEmojiExplosion();
 
   // Optimistic update - show the new total immediately
   updateIdentityInfoDisplay(newTotalTDH, availableTDH - boostAmount);
@@ -746,6 +1182,8 @@ function showNextSubmission(): void {
   if (currentSubmissions.length === 0) return;
   
   currentSubmissionIndex = (currentSubmissionIndex + 1) % currentSubmissions.length;
+  resetRepButtonState(false);
+  showTdhLoading('..');
   const submission = currentSubmissions[currentSubmissionIndex];
   loadSubmissionIntoVisualizer(submission);
   updateActivePlaylistItem();
@@ -755,6 +1193,8 @@ function showPreviousSubmission(): void {
   if (currentSubmissions.length === 0) return;
   
   currentSubmissionIndex = (currentSubmissionIndex - 1 + currentSubmissions.length) % currentSubmissions.length;
+  resetRepButtonState(false);
+  showTdhLoading('..');
   const submission = currentSubmissions[currentSubmissionIndex];
   loadSubmissionIntoVisualizer(submission);
   updateActivePlaylistItem();
@@ -842,36 +1282,14 @@ async function detectAndRenderContent(mediaUrl: string, submission: any): Promis
       visualizerContent.innerHTML = `<img src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" />`;
     } else if (contentType.includes('model/gltf-binary') || contentType.includes('model/gltf+json')) {
       // It's a 3D model
-      visualizerContent.innerHTML = `
-        <model-viewer 
-          src="${mediaUrl}" 
-          alt="${submission.title || '3D Model'}"
-          class="visualizer-media"
-          auto-rotate
-          camera-controls
-          shadow-intensity="1"
-          ar
-          ar-modes="webxr scene-viewer quick-look"
-        ></model-viewer>
-      `;
+      render3DModel(visualizerContent, mediaUrl, submission);
     } else {
       // Unknown content type, use heuristics
       if (mediaUrl.includes('arweave.net') || mediaUrl.includes('ipfs.io')) {
         visualizerContent.innerHTML = `<iframe src="${mediaUrl}" class="visualizer-media" frameborder="0" allowfullscreen></iframe>`;
       } else if (mediaUrl.toLowerCase().includes('.glb') || mediaUrl.toLowerCase().includes('.gltf')) {
         // Try 3D model as fallback
-        visualizerContent.innerHTML = `
-          <model-viewer 
-            src="${mediaUrl}" 
-            alt="${submission.title || '3D Model'}"
-            class="visualizer-media"
-            auto-rotate
-            camera-controls
-            shadow-intensity="1"
-            ar
-            ar-modes="webxr scene-viewer quick-look"
-          ></model-viewer>
-        `;
+        render3DModel(visualizerContent, mediaUrl, submission);
       } else {
         // Last resort - try as image
         visualizerContent.innerHTML = `<img src="${mediaUrl}" alt="${submission.title || 'Meme'}" class="visualizer-media" />`;
@@ -955,19 +1373,7 @@ function loadSubmissionIntoVisualizer(submission: any): void {
       }
     }
   } else if (is3DModel) {
-    // Render 3D model using model-viewer
-    visualizerContent.innerHTML = `
-      <model-viewer 
-        src="${mediaUrl}" 
-        alt="${submission.title || '3D Model'}"
-        class="visualizer-media"
-        auto-rotate
-        camera-controls
-        shadow-intensity="1"
-        ar
-        ar-modes="webxr scene-viewer quick-look"
-      ></model-viewer>
-    `;
+    render3DModel(visualizerContent, mediaUrl, submission);
   } else if (isHtml) {
     // For HTML content, create an iframe to embed it safely
     visualizerContent.innerHTML = `<iframe src="${mediaUrl}" class="visualizer-media" frameborder="0" allowfullscreen></iframe>`;
@@ -1015,6 +1421,11 @@ function loadSubmissionIntoVisualizer(submission: any): void {
     
     // Update TDH slider position and scale
     updateTDHSlider(assignedTDH, repValue);
+
+    // Fetch REP data for the artist/category
+    updateRepDataForSubmission(submission).catch(error => {
+      console.error('Failed to load REP data', error);
+    });
   } catch (error) {
     console.error('Error updating identity info:', error);
     // Set slider to 0 position on error
@@ -1053,6 +1464,219 @@ function updateTDHSlider(assignedTDH: number, availableTDH: number): void {
   (window as any).votingData = votingData;
   (window as any).currentAssignedTDH = assignedTDH;
   (window as any).pendingTDHAssignment = assignedTDH;
+}
+
+function showRepLoading(message: string = '..'): void {
+  setMemeLoading('identityRep', message);
+}
+
+async function updateRepDataForSubmission(submission: any): Promise<void> {
+  if (!submission || !submission.author) {
+    updateRepSlider(0, 0);
+    return;
+  }
+
+  const artistIdentity = submission.author.primary_address || submission.author.id || '';
+  const category = (submission.title || 'Untitled').trim() || 'Untitled';
+  const artistHandle = submission.author?.handle || 'Artist';
+
+  if (!artistIdentity) {
+    updateRepSlider(0, 0);
+    return;
+  }
+
+  const requestId = ++repDataRequestId;
+  currentRepCategory = category;
+  currentRepArtistHandle = artistHandle;
+  resetRepButtonState(false);
+  showRepLoading();
+
+  try {
+    const [assignedRep, repCredit] = await Promise.all([
+      sdk.getRepRating(artistIdentity, category),
+      sdk.getRepCredit()
+    ]);
+
+    if (requestId !== repDataRequestId) return;
+
+    const assignedValue = assignedRep || 0;
+    const creditValue = repCredit.rep_credit || 0;
+    updateRepSlider(assignedValue, creditValue);
+  } catch (error) {
+    console.error('Failed to fetch REP data', error);
+    if (requestId !== repDataRequestId) return;
+    updateRepSlider(0, 0);
+  }
+}
+
+function updateRepSlider(assignedRep: number, repCredit: number): void {
+  const repSlider = document.getElementById('slider1') as HTMLElement | null;
+  const totalAssigned = normalizeInteger(assignedRep);
+  const credit = normalizeNonNegative(repCredit);
+  const sliderAssigned = Math.max(0, totalAssigned);
+  const sliderMax = sliderAssigned + credit;
+  repSliderMax = sliderMax;
+  currentRepAssignment = sliderAssigned;
+  currentRepTotalAssigned = totalAssigned;
+  pendingRepAssignment = sliderAssigned;
+  availableRepCredit = credit;
+  (window as any).currentRepAssignment = currentRepAssignment;
+  (window as any).pendingRepAssignment = pendingRepAssignment;
+  (window as any).availableRepCredit = availableRepCredit;
+  (window as any).repSliderMax = repSliderMax;
+
+  const positionPercentage = repSliderMax > 0 ? (sliderAssigned / repSliderMax) * 100 : 0;
+  if (repSlider) {
+    repSlider.style.left = `${positionPercentage}%`;
+    updateMemeampTooltip(repSlider, formatRepTooltip(sliderAssigned));
+  }
+
+  updateIdentityInfoDisplay((window as any).currentAssignedTDH || 0, totalAssigned);
+  updateRepButtonState();
+}
+
+function handleRepSliderInput(percentage: number): void {
+  if (repSliderMax <= 0) return;
+
+  const repSlider = document.getElementById('slider1') as HTMLElement | null;
+  const unclamped = Math.round((percentage / 100) * repSliderMax);
+  const newAssignment = clampSliderValue(unclamped);
+
+  pendingRepAssignment = newAssignment;
+  (window as any).pendingRepAssignment = newAssignment;
+
+  if (repSlider) {
+    updateMemeampTooltip(repSlider, formatRepTooltip(newAssignment));
+  }
+
+  updateIdentityInfoDisplay((window as any).currentAssignedTDH || 0, newAssignment);
+  updateRepButtonState();
+}
+
+(window as any).handleRepSliderInput = handleRepSliderInput;
+
+function updateRepButtonState(): void {
+  const repButton = document.getElementById('repButton');
+  if (!repButton) return;
+
+  const delta = pendingRepAssignment - currentRepAssignment;
+  const canAssign =
+    (delta > 0 && delta <= availableRepCredit) ||
+    delta < 0;
+  if (canAssign) {
+    repButton.classList.add('visible');
+  } else {
+    repButton.classList.remove('visible');
+  }
+}
+
+(function exposeRepHandlers() {
+  (window as any).handleRepSliderInput = handleRepSliderInput;
+  (window as any).resetRepButtonState = resetRepButtonState;
+  (window as any).formatRepTooltip = formatRepTooltip;
+})();
+
+function formatRepTooltip(amount: number): string {
+  const artistLabel = currentRepArtistHandle ? currentRepArtistHandle : 'the artist';
+  const titleLabel = currentRepCategory ? currentRepCategory : 'this meme';
+  const sanitized = clampSliderValue(amount);
+  return `Give ${artistLabel} ${sanitized.toLocaleString()} REP for “${titleLabel}”`;
+}
+
+function normalizeInteger(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value);
+}
+
+function normalizeNonNegative(value: number): number {
+  return Math.max(0, normalizeInteger(value));
+}
+
+function clampSliderValue(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const rounded = Math.round(value);
+  if (rounded < 0) return 0;
+  if (rounded > repSliderMax) return repSliderMax;
+  return rounded;
+}
+
+function resetRepButtonState(resetPending: boolean = true): void {
+  const repButton = document.getElementById('repButton') as HTMLButtonElement | null;
+  if (repButton) {
+    repButton.classList.remove('visible');
+    repButton.classList.remove('loading');
+    repButton.removeAttribute('disabled');
+  }
+
+  if (resetPending) {
+    pendingRepAssignment = currentRepAssignment;
+    (window as any).pendingRepAssignment = pendingRepAssignment;
+    updateRepButtonState();
+    updateIdentityInfoDisplay((window as any).currentAssignedTDH || 0, currentRepAssignment);
+  }
+}
+
+async function assignRepToCurrentSubmission(): Promise<void> {
+  if (!votingData) {
+    showError('Connect your wallet to assign REP.');
+    return;
+  }
+
+  if (currentSubmissions.length === 0) {
+    showError('No submission selected to assign REP.');
+    return;
+  }
+
+  const submission = currentSubmissions[currentSubmissionIndex];
+  if (!submission) {
+    showError('Unable to find the current submission.');
+    return;
+  }
+
+  const repButton = document.getElementById('repButton') as HTMLButtonElement | null;
+  const desiredRep = pendingRepAssignment;
+  const currentSliderAssigned = Math.max(0, currentRepTotalAssigned);
+  const increaseNeeded = Math.max(0, desiredRep - currentSliderAssigned);
+
+  if (increaseNeeded > availableRepCredit) {
+    showError('Not enough REP credit available.');
+    return;
+  }
+
+  const artistIdentity = submission.author?.primary_address || submission.author?.id || '';
+  if (!artistIdentity) {
+    showError('Artist identity unavailable for REP assignment.');
+    return;
+  }
+
+  const category = currentRepCategory || (submission.title || 'Untitled').trim() || 'Untitled';
+
+  repButton?.classList.add('loading');
+  repButton?.setAttribute('disabled', 'true');
+  showRepLoading();
+
+  try {
+    await sdk.assignRep(artistIdentity, desiredRep, category);
+
+    const decrease = Math.max(0, currentSliderAssigned - desiredRep);
+    availableRepCredit = availableRepCredit - increaseNeeded + decrease;
+    currentRepTotalAssigned = desiredRep;
+    updateRepSlider(currentRepTotalAssigned, availableRepCredit);
+    repButton?.classList.remove('visible');
+
+    // Ensure UI reflects authoritative server value
+    updateRepDataForSubmission(submission).catch(err => {
+      console.warn('REP refresh failed after assignment', err);
+    });
+  } catch (error) {
+    console.error('REP assignment failed', error);
+    showError('REP assignment failed. Please try again.');
+    // Revert optimistic update
+    await updateRepDataForSubmission(submission);
+  } finally {
+    repButton?.classList.remove('loading');
+    repButton?.removeAttribute('disabled');
+  }
 }
 
 // Format TDH amount to compact notation (max 4 characters)

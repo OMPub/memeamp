@@ -218,6 +218,16 @@ body {
   box-sizing: border-box;
 }
 
+.emoji-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 69px;
+  pointer-events: none;
+  will-change: transform, opacity;
+  z-index: 5;
+}
+
 .visualizer-media {
   width: 100%;
   height: 100%;
@@ -414,6 +424,11 @@ body {
   transition-duration: 0.05s;
 }
 
+.nav-btn.key-active {
+  transform: translateY(2px);
+  transition-duration: 0.05s;
+}
+
 .prev-btn {
   background-image: var(--left-btn-default);
 }
@@ -423,6 +438,10 @@ body {
 }
 
 .prev-btn:active {
+  background-image: var(--left-btn-hover);
+}
+
+.prev-btn.key-active {
   background-image: var(--left-btn-hover);
 }
 
@@ -438,6 +457,10 @@ body {
   background-image: var(--right-btn-hover);
 }
 
+.next-btn.key-active {
+  background-image: var(--right-btn-hover);
+}
+
 .add-btn {
   background-image: var(--add-btn-default);
   margin: 0 4px;
@@ -448,6 +471,10 @@ body {
 }
 
 .add-btn:active {
+  background-image: var(--add-btn-hover);
+}
+
+.add-btn.key-active {
   background-image: var(--add-btn-hover);
 }
 
@@ -506,6 +533,42 @@ body {
   border-radius: 2px;
   transition: all 0.1s ease;
   box-shadow: none;
+}
+
+.rep-button {
+  position: absolute;
+  top: 124px;
+  left: 475px;
+  width: 48px;
+  height: 25px;
+  cursor: pointer;
+  z-index: 11;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: var(--rep-btn-image) center/contain no-repeat;
+  border-radius: 2px;
+  transition: opacity 0.1s ease;
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rep-button.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.rep-button.loading {
+  opacity: 0;
+  cursor: wait;
+  filter: grayscale(0.5);
+}
+
+.rep-button.visible ~ .vote-button,
+.rep-button.loading ~ .vote-button {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .vote-button:hover {

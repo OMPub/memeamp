@@ -55,6 +55,11 @@ export interface RepRatingResponse {
   rating: number;
 }
 
+export interface RepCredit {
+  cic_credit?: number;
+  rep_credit?: number;
+}
+
 export interface UserIdentity {
   tdh: number;
   address: string;
@@ -129,7 +134,6 @@ export interface SDKEventData {
   voting?: { dropId: string; amount: number };
   voteSubmitted?: { dropId: string; amount: number; response: any };
   voteError?: { dropId: string; amount: number; error: string };
-  leaderboardUpdated?: { drops: any[] };
   repAssigning?: { identity: string; amount: number; category?: string };
   repAssigned?: { identity: string; amount: number; category?: string; response: RepAssignmentResponse };
   repError?: { identity: string; amount: number; category?: string; error: string };
@@ -396,6 +400,40 @@ export class SixFiveTwoNineVotingSDK {
       this.callbacks?.onError?.((error as Error).message);
       throw error;
     }
+  }
+
+  private async fetchRepRating(identity: string, params: URLSearchParams): Promise<RepRatingResponse> {
+    const query = params.toString();
+    const url = query ? `/api/profiles/${identity}/rep/rating?${query}` : `/api/profiles/${identity}/rep/rating`;
+    return this.authenticatedRequest(url) as Promise<RepRatingResponse>;
+  }
+
+  /**
+   * Retrieve total REP allocated to an identity (optionally filtered by category)
+   */
+  async getIdentityRepSummary(identity: string, category?: string): Promise<RepRatingResponse> {
+    if (!identity) {
+      throw new Error('Identity is required');
+    }
+
+    const params = new URLSearchParams();
+    if (category && category.trim()) {
+      params.set('category', category.trim());
+    }
+
+    return this.fetchRepRating(identity, params);
+  }
+
+  /**
+   * Retrieve total REP you (or the connected wallet) have received
+   */
+  async getMyRepReceived(category?: string): Promise<number> {
+    if (!this.userAddress) {
+      throw new Error('No wallet address set');
+    }
+
+    const summary = await this.getIdentityRepSummary(this.userAddress, category);
+    return summary.rating || 0;
   }
 
   /**
@@ -763,12 +801,29 @@ export class SixFiveTwoNineVotingSDK {
       params.set('from_identity', raterIdentity);
     }
 
-    const query = params.toString();
-    const url = query ? `/api/profiles/${identity}/rep/rating?${query}` : `/api/profiles/${identity}/rep/rating`;
-
-    const response = await this.authenticatedRequest(url);
-    const repResponse = response as RepRatingResponse;
+    const repResponse = await this.fetchRepRating(identity, params);
     return repResponse.rating || 0;
+  }
+
+  /**
+   * Retrieve available REP credit for the connected wallet (or supplied rater)
+   */
+  async getRepCredit(rater?: string, representative?: string): Promise<RepCredit> {
+    const raterIdentity = rater || this.userAddress;
+
+    if (!raterIdentity) {
+      throw new Error('Rater identity is required to get REP credit');
+    }
+
+    const params = new URLSearchParams({ rater: raterIdentity });
+    if (representative && representative.trim()) {
+      params.set('rater_representative', representative.trim());
+    }
+
+    const query = params.toString();
+    const url = `/api/ratings/credit?${query}`;
+    const response = await this.authenticatedRequest(url);
+    return response as RepCredit;
   }
 
   /**
