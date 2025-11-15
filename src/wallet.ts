@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 import type { WalletState, WalletElements } from './types';
 import SixFiveTwoNineVotingSDK, { type VotingData } from './6529-sdk';
 import { updateMemeampTooltip } from './tooltip';
+import { formatCompactTDH, normalizeTDHToPattern } from './utils/tdh';
 
 function render3DModel(container: HTMLElement, url: string, submission: any): void {
   container.innerHTML = '';
@@ -566,6 +567,7 @@ async function authenticateWith6529(): Promise<void> {
           currentSubmissionIndex = index;
           const submission = currentSubmissions[index];
           if (submission) {
+            showTdhLoading('..');
             loadSubmissionIntoVisualizer(submission);
             updateActivePlaylistItem();
           }
@@ -597,32 +599,15 @@ function formatVotes(votes: number): string {
   }
 }
 
-// Load submission into the visualizer area
-// Format number with K/M/B suffixes (3 significant figures)
-function formatNumber(num: number): string {
-  if (num === 0) {
-    return '0';
-  }
-  if (num >= 1000000000) {
-    return (num / 1000000000).toPrecision(3) + 'B';
-  } else if (num >= 1000000) {
-    return (num / 1000000).toPrecision(3) + 'M';
-  } else if (num >= 1000) {
-    return (num / 1000).toPrecision(3) + 'K';
-  }
-  return num.toPrecision(3);
-}
-
 // Update identity info display
 function updateIdentityInfoDisplay(tdh: number, rep?: number): void {
   const tdhElement = document.getElementById('identityTdh');
   const repElement = document.getElementById('identityRep');
-  
-  
+
   if (tdhElement) {
-    tdhElement.textContent = formatNumber(tdh);
+    tdhElement.textContent = formatCompactTDH(tdh);
   }
-  
+
   if (repElement && rep !== undefined) {
     repElement.textContent = formatRepDisplay(rep);
   }
@@ -643,50 +628,6 @@ function formatRepDisplay(value: number): string {
     return `${sign}${(abs / 1_000).toFixed(precision)}K`;
   }
   return `${sign}${abs.toFixed(0)}`;
-}
-
-function normalizeTDHToPattern(requested: number, max: number): number {
-  if (!Number.isFinite(requested) || !Number.isFinite(max)) return 0;
-
-  let maxInt = Math.max(0, Math.floor(max));
-  let reqInt = Math.max(0, Math.round(requested));
-
-  if (maxInt === 0) return 0;
-  if (reqInt > maxInt) reqInt = maxInt;
-
-  // Only apply pattern for 5+ digit values
-  if (reqInt < 10000 || maxInt < 10000) {
-    return reqInt;
-  }
-
-  const base = Math.floor(reqInt / 10000);
-
-  // Candidate below or equal to requested
-  let down = base * 10000 + 4753;
-  if (down > reqInt) {
-    down = (base - 1) * 10000 + 4753;
-  }
-  if (down < 10000 || down > maxInt) {
-    down = NaN as any;
-  }
-
-  // Candidate above or equal to requested
-  let upBase = base;
-  if (!Number.isNaN(down) && down < reqInt) {
-    upBase = base + 1;
-  }
-  let up = upBase * 10000 + 4753;
-  if (up < 10000 || up > maxInt) {
-    up = NaN as any;
-  }
-
-  if (Number.isNaN(down) && Number.isNaN(up)) {
-    return reqInt;
-  }
-  if (Number.isNaN(down)) return up;
-  if (Number.isNaN(up)) return down;
-
-  return Math.abs(up - reqInt) < Math.abs(reqInt - down) ? up : down;
 }
 
 type EmojiParticle = {
@@ -1676,17 +1617,6 @@ async function assignRepToCurrentSubmission(): Promise<void> {
   } finally {
     repButton?.classList.remove('loading');
     repButton?.removeAttribute('disabled');
-  }
-}
-
-// Format TDH amount to compact notation (max 4 characters)
-function formatCompactTDH(amount: number): string {
-  if (amount >= 1000000) {
-    return (amount / 1000000).toFixed(2) + 'M'; // e.g., 2.11M
-  } else if (amount >= 1000) {
-    return (amount / 1000).toFixed(0) + 'K'; // e.g., 133K
-  } else {
-    return amount.toString(); // e.g., 999
   }
 }
 

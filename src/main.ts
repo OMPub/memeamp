@@ -18,6 +18,7 @@ import plusBtnHover from './assets/memeamp-buttons/PLUS_hover.png'
 import plusBtnClick from './assets/memeamp-buttons/PLUS_click.png'
 import repButtonImg from './assets/rep.png'
 import { attachMemeampTooltip, updateMemeampTooltip } from './tooltip'
+import { formatCompactTDH, normalizeTDHToPattern } from './utils/tdh'
 
 const modelViewerScript = document.createElement('script')
 modelViewerScript.type = 'module'
@@ -232,61 +233,6 @@ function updateTDHFromSlider(percentage: number): void {
   
   // Store the new assignment for submission
   (window as any).pendingTDHAssignment = newAssignment
-}
-
-// Format TDH amount to compact notation (max 4 characters)
-function formatCompactTDH(amount: number): string {
-  if (amount >= 1000000) {
-    return (amount / 1000000).toFixed(2) + 'M' // e.g., 2.11M
-  } else if (amount >= 1000) {
-    return (amount / 1000).toFixed(0) + 'K' // e.g., 133K
-  } else {
-    return amount.toString() // e.g., 999
-  }
-}
-
-function normalizeTDHToPattern(requested: number, max: number): number {
-  if (!Number.isFinite(requested) || !Number.isFinite(max)) return 0
-
-  let maxInt = Math.max(0, Math.floor(max))
-  let reqInt = Math.max(0, Math.round(requested))
-
-  if (maxInt === 0) return 0
-  if (reqInt > maxInt) reqInt = maxInt
-
-  // Only apply pattern for 5+ digit values
-  if (reqInt < 10000 || maxInt < 10000) {
-    return reqInt
-  }
-
-  const base = Math.floor(reqInt / 10000)
-
-  // Candidate below or equal to requested
-  let down = base * 10000 + 4753
-  if (down > reqInt) {
-    down = (base - 1) * 10000 + 4753
-  }
-  if (down < 10000 || down > maxInt) {
-    down = NaN as any
-  }
-
-  // Candidate above or equal to requested
-  let upBase = base
-  if (!Number.isNaN(down) && down < reqInt) {
-    upBase = base + 1
-  }
-  let up = upBase * 10000 + 4753
-  if (up < 10000 || up > maxInt) {
-    up = NaN as any
-  }
-
-  if (Number.isNaN(down) && Number.isNaN(up)) {
-    return reqInt
-  }
-  if (Number.isNaN(down)) return up
-  if (Number.isNaN(up)) return down
-
-  return Math.abs(up - reqInt) < Math.abs(reqInt - down) ? up : down
 }
 
 initSliders()

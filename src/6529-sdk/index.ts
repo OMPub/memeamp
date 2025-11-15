@@ -102,26 +102,6 @@ export interface SDKState {
   isWalletConnected: boolean;
 }
 
-export type SDKEvent = 
-  | 'walletConnected'
-  | 'authenticating' 
-  | 'authenticated'
-  | 'authenticationError'
-  | 'authCleared'
-  | 'loadingData'
-  | 'dataLoaded'
-  | 'dataError'
-  | 'voting'
-  | 'voteSubmitted'
-  | 'leaderboardUpdated'
-  | 'voteError'
-  | 'repAssigning'
-  | 'repAssigned'
-  | 'repError'
-  | 'userDataRefreshed'
-  | 'userDataError'
-  | 'stateImported';
-
 export interface SDKEventData {
   walletConnected?: { address: string };
   authenticating?: {};
@@ -133,6 +113,7 @@ export interface SDKEventData {
   dataError?: { error: string };
   voting?: { dropId: string; amount: number };
   voteSubmitted?: { dropId: string; amount: number; response: any };
+  leaderboardUpdated?: { drops: Drop[] };
   voteError?: { dropId: string; amount: number; error: string };
   repAssigning?: { identity: string; amount: number; category?: string };
   repAssigned?: { identity: string; amount: number; category?: string; response: RepAssignmentResponse };
@@ -141,6 +122,8 @@ export interface SDKEventData {
   userDataError?: { error: string };
   stateImported?: SDKState;
 }
+
+export type SDKEvent = keyof SDKEventData;
 
 export type EventCallback<T extends SDKEvent = SDKEvent> = (data: SDKEventData[T]) => void;
 
