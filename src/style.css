@@ -50,6 +50,19 @@ body {
   padding: 20px;
 }
 
+@media (max-width: 700px) {
+  .memeamp-player {
+    padding: 10px 0;
+    align-items: flex-start;
+  }
+}
+
+.player-shell {
+  display: block;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
 .player-skin {
   width: 600px;
   min-width: 600px;
@@ -688,6 +701,7 @@ body {
   display: flex;
   align-items: center;
   pointer-events: auto;
+  touch-action: none;
 }
 
 /* Orange slider (top) */
@@ -717,6 +731,7 @@ body {
   cursor: grab;
   z-index: 3;
   transform: translateX(-50%);
+  touch-action: none;
 }
 
 .slider-handle.orange {

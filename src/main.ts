@@ -44,8 +44,9 @@ htmlStyles.setProperty('--rep-btn-image', `url(${repButtonImg})`)
 // Create the app HTML structure
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="memeamp-player">
-    <!-- Background Skin -->
-    <div class="player-skin">
+    <div class="player-shell">
+      <!-- Background Skin -->
+      <div class="player-skin">
       <img src="${skinImage}" alt="MEMEAMP Player" class="skin-image" />
       
       <!-- Wave Visualizer (Upper Left) -->
@@ -156,6 +157,23 @@ const walletElements: WalletElements = {
 
 initWallet(walletElements)
 
+function applyPlayerScale() {
+  const shell = document.querySelector<HTMLElement>('.player-shell')
+  const skin = shell?.querySelector<HTMLElement>('.player-skin') ?? null
+  if (!shell || !skin) return
+
+  const DESIGN_WIDTH = 600
+  const viewportWidth = window.innerWidth
+  const widthScale = viewportWidth / DESIGN_WIDTH
+  const scale = Math.min(1, widthScale * 0.96)
+
+  const visualWidth = DESIGN_WIDTH * scale
+  shell.style.width = `${visualWidth}px`
+
+  skin.style.transformOrigin = 'top left'
+  skin.style.transform = `scale(${scale})`
+}
+
 // Initialize slider drag functionality
 function initSliders() {
   const sliders = document.querySelectorAll('.slider-handle')
@@ -165,6 +183,12 @@ function initSliders() {
     let container: HTMLElement | null = null
     
     slider.addEventListener('mousedown', (e) => {
+      isDragging = true
+      container = (slider as HTMLElement).closest('.slider-container')
+      e.preventDefault()
+    })
+
+    slider.addEventListener('touchstart', (e) => {
       isDragging = true
       container = (slider as HTMLElement).closest('.slider-container')
       e.preventDefault()
@@ -193,8 +217,42 @@ function initSliders() {
         }
       }
     })
+
+    document.addEventListener('touchmove', (e) => {
+      if (!isDragging || !container) return
+
+      const touch = e.touches[0]
+      if (!touch) return
+
+      const rect = container.getBoundingClientRect()
+      const x = touch.clientX - rect.left
+      const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100))
+
+      ;(slider as HTMLElement).style.left = `${percentage}%`
+
+      const sliderId = (slider as HTMLElement).id
+      if (sliderId === 'slider2') {
+        updateTDHFromSlider(percentage)
+        const repReset = (window as any).resetRepButtonState
+        if (typeof repReset === 'function') {
+          repReset()
+        }
+      } else if (sliderId === 'slider1') {
+        const repHandler = (window as any).handleRepSliderInput
+        if (typeof repHandler === 'function') {
+          repHandler(percentage)
+        }
+      }
+
+      e.preventDefault()
+    }, { passive: false })
     
     document.addEventListener('mouseup', () => {
+      isDragging = false
+      container = null
+    })
+
+    document.addEventListener('touchend', () => {
       isDragging = false
       container = null
     })
@@ -305,3 +363,7 @@ function initTooltips(): void {
 }
 
 initTooltips()
+
+applyPlayerScale()
+window.addEventListener('resize', applyPlayerScale)
+window.addEventListener('orientationchange', applyPlayerScale)

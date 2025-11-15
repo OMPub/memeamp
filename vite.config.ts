@@ -9,7 +9,7 @@ export default defineConfig({
         target: 'https://api.6529.io',
         changeOrigin: true,
         secure: true,
-        rewrite: (path) => path.replace(/^\/api-6529/, ''),
+        rewrite: (path: string) => path.replace(/^\/api-6529/, ''),
       },
     },
   }
