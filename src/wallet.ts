@@ -855,6 +855,18 @@ function updateBoostTooltip(): void {
       const requestedTotal = currentTDH + rawBoost;
       const normalizedTotal = normalizeTDHToPattern(requestedTotal, maxTDH);
       boostAmount = Math.max(0, normalizedTotal - currentTDH);
+      // Include normalized total in tooltip so the snapped ...67 pattern is visible
+      if (boostAmount > 0) {
+        const finalTotal = normalizedTotal;
+        updateMemeampTooltip(
+          addButton,
+          `BOOST: Instantly upvote ${boostAmount.toLocaleString()} MOAR TDH (to ${finalTotal.toLocaleString()} total)`
+        );
+        if (elements?.errorMessage?.textContent?.includes('Need at least 1 available TDH to boost.')) {
+          hideError();
+        }
+        return;
+      }
     } else {
       boostAmount = calculateBoostAmount(availableTDH);
     }
