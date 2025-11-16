@@ -4,6 +4,47 @@
   box-sizing: border-box;
 }
 
+/* Memeamp Top Nav */
+.memeamp-top-nav {
+  width: 558px;
+  padding: 4px 16px;
+  margin: 0 20px;
+  background: rgba(8, 10, 20, 0.75);
+  border-radius: 8px 8px 0 0;
+  color: #00ff00;
+  font-family: 'OCR-B', monospace;
+  font-size: 14px;
+}
+
+.memeamp-top-nav-inner {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.memeamp-top-nav-prefix,
+.memeamp-top-nav-separator {
+  color: #00ff00;
+}
+
+.memeamp-top-nav-link {
+  color: #00ff00;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+
+.memeamp-top-nav-link:hover {
+  text-decoration: underline;
+}
+
+.memeamp-top-nav-current {
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: default;
+}
+
 /* Memeamp Tooltip */
 .memeamp-tooltip {
   position: fixed;

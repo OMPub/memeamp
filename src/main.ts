@@ -45,6 +45,16 @@ htmlStyles.setProperty('--rep-btn-image', `url(${repButtonImg})`)
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="memeamp-player">
     <div class="player-shell">
+      <nav class="memeamp-top-nav" aria-label="Memeamp main navigation">
+        <div class="memeamp-top-nav-inner">
+          <span class="memeamp-top-nav-prefix">&gt;&gt;</span>
+          <a href="https://memeamp.com" class="memeamp-top-nav-link">home</a>
+          <span class="memeamp-top-nav-separator">&gt;&gt;</span>
+          <a href="https://play.memeamp.com" class="memeamp-top-nav-link">play</a>
+          <span class="memeamp-top-nav-separator">&gt;&gt;</span>
+          <span class="memeamp-top-nav-link memeamp-top-nav-current">vote</span>
+        </div>
+      </nav>
       <!-- Background Skin -->
       <div class="player-skin">
       <img src="${skinImage}" alt="MEMEAMP Player" class="skin-image" />
