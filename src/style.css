@@ -277,7 +277,8 @@ body {
   left: 0;
   top: 0;
   font-size: 69px;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: grab;
   will-change: transform, opacity;
   z-index: 5;
 }

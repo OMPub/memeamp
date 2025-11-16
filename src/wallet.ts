@@ -788,6 +788,17 @@ let emojiParticles: EmojiParticle[] = [];
 let emojiAnimationFrameId: number | null = null;
 let lastEmojiFrameTime = 0;
 
+let activeEmojiDrag: EmojiParticle | null = null;
+let activeEmojiPointerId: number | null = null;
+let activeEmojiDragOffsetX = 0;
+let activeEmojiDragOffsetY = 0;
+let lastEmojiDragX = 0;
+let lastEmojiDragY = 0;
+let lastEmojiDragTime = 0;
+let emojiPointerListenersAttached = false;
+let lastEmojiSegmentVX = 0;
+let lastEmojiSegmentVY = 0;
+
 function sampleEmojiLifetimeMs(): number {
   const mean = 21000; // 21 seconds
   const stdDev = 6000; // spread around the mean
@@ -801,6 +812,121 @@ function sampleEmojiLifetimeMs(): number {
   if (ms < min) ms = min;
   if (ms > max) ms = max;
   return ms;
+}
+
+function attachEmojiGlobalPointerListeners(): void {
+  if (emojiPointerListenersAttached) return;
+  emojiPointerListenersAttached = true;
+
+  window.addEventListener('pointermove', handleEmojiPointerMove);
+  window.addEventListener('pointerup', handleEmojiPointerUpOrCancel);
+  window.addEventListener('pointercancel', handleEmojiPointerUpOrCancel);
+}
+
+function handleEmojiPointerDown(event: PointerEvent): void {
+  const target = event.currentTarget as HTMLSpanElement | null;
+  if (!target || !target.classList.contains('emoji-particle')) {
+    return;
+  }
+
+  const player = document.querySelector('.player-skin') as HTMLElement | null;
+  if (!player) return;
+
+  const rect = player.getBoundingClientRect();
+  const localX = event.clientX - rect.left;
+  const localY = event.clientY - rect.top;
+
+  const particle = emojiParticles.find(p => p.el === target);
+  if (!particle) return;
+
+  attachEmojiGlobalPointerListeners();
+
+  activeEmojiDrag = particle;
+  activeEmojiPointerId = event.pointerId;
+  activeEmojiDragOffsetX = particle.x - localX;
+  activeEmojiDragOffsetY = particle.y - localY;
+  lastEmojiDragX = particle.x;
+  lastEmojiDragY = particle.y;
+  lastEmojiDragTime = event.timeStamp;
+  lastEmojiSegmentVX = 0;
+  lastEmojiSegmentVY = 0;
+
+  const now = performance.now();
+  particle.createdAt = now;
+  particle.lifeMs = sampleEmojiLifetimeMs();
+  particle.el.style.opacity = '1';
+
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function handleEmojiPointerMove(event: PointerEvent): void {
+  if (!activeEmojiDrag || activeEmojiPointerId !== event.pointerId) {
+    return;
+  }
+
+  const player = document.querySelector('.player-skin') as HTMLElement | null;
+  if (!player) return;
+
+  const rect = player.getBoundingClientRect();
+  const localX = event.clientX - rect.left;
+  const localY = event.clientY - rect.top;
+
+  const newX = localX + activeEmojiDragOffsetX;
+  const newY = localY + activeEmojiDragOffsetY;
+
+   const dxSeg = newX - lastEmojiDragX;
+   const dySeg = newY - lastEmojiDragY;
+   const dtMs = event.timeStamp - lastEmojiDragTime;
+   if (dtMs > 0) {
+     const dtSec = dtMs / 1000;
+     lastEmojiSegmentVX = dxSeg / dtSec;
+     lastEmojiSegmentVY = dySeg / dtSec;
+   }
+
+  activeEmojiDrag.x = newX;
+  activeEmojiDrag.y = newY;
+  lastEmojiDragX = newX;
+  lastEmojiDragY = newY;
+  lastEmojiDragTime = event.timeStamp;
+}
+
+function handleEmojiPointerUpOrCancel(event: PointerEvent): void {
+  if (!activeEmojiDrag || activeEmojiPointerId !== event.pointerId) {
+    return;
+  }
+
+  const particle = activeEmojiDrag;
+
+  const speedScale = 6;
+  let vx = lastEmojiSegmentVX * speedScale;
+  let vy = lastEmojiSegmentVY * speedScale;
+
+  const speed = Math.hypot(vx, vy);
+
+  if (speed < 200) {
+    particle.vx = 0;
+    particle.vy = 0;
+  } else {
+    const maxSpeed = 1600;
+    if (speed > maxSpeed) {
+      const scale = maxSpeed / speed;
+      vx *= scale;
+      vy *= scale;
+    }
+    particle.vx = vx;
+    particle.vy = vy;
+  }
+
+  const spinBase = Math.min(speed / 4, 720);
+  const spinSign = Math.sign(vx || 1);
+  particle.vr = spinBase * spinSign;
+
+  activeEmojiDrag = null;
+  activeEmojiPointerId = null;
+
+  event.preventDefault();
+  event.stopPropagation();
 }
 
 function pickBoostEmoji(): string {
@@ -837,6 +963,7 @@ function triggerBoostEmojiExplosion(): void {
     const span = document.createElement('span');
     span.className = 'emoji-particle';
     span.textContent = pickBoostEmoji();
+    span.addEventListener('pointerdown', handleEmojiPointerDown);
     player.appendChild(span);
 
     const angleSpread = Math.PI / 2; // 90deg cone
@@ -912,28 +1039,32 @@ function stepEmojiParticles(timestamp: number): void {
       continue;
     }
 
-    p.vy += gravity * dt;
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-    p.rotation += p.vr * dt;
+    const isDraggingThis = activeEmojiDrag === p;
 
-    if (p.x < radius + sideMargin) {
-      p.x = radius + sideMargin;
-      p.vx *= -wallDamping;
-    } else if (p.x > width - radius - sideMargin) {
-      p.x = width - radius - sideMargin;
-      p.vx *= -wallDamping;
-    }
+    if (!isDraggingThis) {
+      p.vy += gravity * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rotation += p.vr * dt;
 
-    if (p.y > floor) {
-      p.y = floor;
-      p.vy *= -floorDamping;
-      p.vx *= 0.85;
+      if (p.x < radius + sideMargin) {
+        p.x = radius + sideMargin;
+        p.vx *= -wallDamping;
+      } else if (p.x > width - radius - sideMargin) {
+        p.x = width - radius - sideMargin;
+        p.vx *= -wallDamping;
+      }
+
+      if (p.y > floor) {
+        p.y = floor;
+        p.vy *= -floorDamping;
+        p.vx *= 0.85;
+      }
     }
 
     // Once particles are effectively settled near the floor, ease their spin down
     const nearFloor = p.y >= floor - 1 && Math.abs(p.vy) < 40;
-    if (nearFloor) {
+    if (nearFloor && !isDraggingThis) {
       const spinDamp = Math.max(0, 1 - 3 * dt); // strong damping when settled
       p.vr *= spinDamp;
     }
