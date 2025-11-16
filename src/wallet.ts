@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import type { WalletState, WalletElements } from './types';
-import SixFiveTwoNineVotingSDK, { type VotingData } from './6529-sdk';
-import { updateMemeampTooltip } from './tooltip';
+import SixFiveTwoNineVotingSDK, { type VotingData, type WaveActivity } from './6529-sdk';
+import { attachMemeampTooltip, updateMemeampTooltip } from './tooltip';
 import { formatCompactTDH, normalizeTDHToPattern } from './utils/tdh';
 
 function render3DModel(container: HTMLElement, url: string, submission: any): void {
@@ -70,6 +70,8 @@ let currentRepCategory = '';
 let currentRepArtistHandle = '';
 let repSliderMax = 0;
 let repDataRequestId = 0;
+let cachedWaveActivity: WaveActivity[] | null = null;
+let isLoadingWaveActivity = false;
 
 const apiBaseURL = import.meta.env.DEV ? '/api-6529' : 'https://api.6529.io';
 
@@ -120,6 +122,7 @@ export function initWallet(walletElements: WalletElements): void {
     const prevButton = document.getElementById('prevButton');
     const nextButton = document.getElementById('nextButton');
     const addButton = document.getElementById('addButton');
+    const myWavesButton = document.getElementById('myWavesButton');
     
     if (prevButton) {
       prevButton.addEventListener('click', showPreviousSubmission);
@@ -146,6 +149,14 @@ export function initWallet(walletElements: WalletElements): void {
         });
       });
       updateBoostTooltip();
+    }
+
+    if (myWavesButton) {
+      myWavesButton.addEventListener('click', () => {
+        loadAndRenderRecentWaves(true).catch((err: unknown) => {
+          console.error('Failed to load recent waves', err);
+        });
+      });
     }
     
     const voteButton = document.getElementById('voteButton');
@@ -580,6 +591,11 @@ async function authenticateWith6529(): Promise<void> {
         document.querySelector('.playlist-item')?.classList.add('active');
       }
     }
+
+    // Preload recent waves for the MY WAVES tray
+    loadAndRenderRecentWaves().catch((error: unknown) => {
+      console.error('Failed to preload recent waves', error);
+    });
     
   } catch (error) {
     console.error('6529 authentication failed');
@@ -628,6 +644,132 @@ function formatRepDisplay(value: number): string {
     return `${sign}${(abs / 1_000).toFixed(precision)}K`;
   }
   return `${sign}${abs.toFixed(0)}`;
+}
+
+function formatWaveActivityAgeLabel(latestActivityAt?: number | null): string | null {
+  if (latestActivityAt === null || latestActivityAt === undefined) {
+    return null;
+  }
+
+  if (!Number.isFinite(latestActivityAt)) {
+    return null;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const raw = latestActivityAt;
+  const activitySeconds = raw > 1e12 ? Math.floor(raw / 1000) : Math.floor(raw);
+  const diff = Math.max(0, nowSeconds - activitySeconds);
+
+  const minute = 60;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diff < minute) {
+    return '1m';
+  }
+
+  if (diff < hour) {
+    const minutes = Math.floor(diff / minute);
+    return `${minutes}m`;
+  }
+
+  if (diff < day) {
+    const hours = Math.floor(diff / hour);
+    return `${hours}h`;
+  }
+
+  const days = Math.floor(diff / day);
+  return `${days}d`;
+}
+
+async function loadAndRenderRecentWaves(forceRefresh = false): Promise<void> {
+  if (!sdk.isWalletConnected() || !sdk.isAuthenticated()) {
+    showError('Connect wallet to load your waves.');
+    return;
+  }
+
+  if (isLoadingWaveActivity) return;
+
+  if (cachedWaveActivity && !forceRefresh) {
+    renderWaveActivityTray(cachedWaveActivity);
+    return;
+  }
+
+  const tray = document.getElementById('myWavesTray');
+  if (tray) {
+    tray.textContent = '..';
+  }
+
+  isLoadingWaveActivity = true;
+  try {
+    const waves = await sdk.getRecentWaveActivity(5);
+    cachedWaveActivity = waves;
+    renderWaveActivityTray(waves);
+  } catch (error) {
+    console.error('Failed to load recent waves:', error);
+    showError('Unable to load waves right now.');
+  } finally {
+    isLoadingWaveActivity = false;
+  }
+}
+
+function renderWaveActivityTray(waves: WaveActivity[]): void {
+  const tray = document.getElementById('myWavesTray');
+  if (!tray) return;
+
+  tray.innerHTML = '';
+
+  if (!waves || waves.length === 0) {
+    const label = document.createElement('span');
+    label.textContent = 'No waves yet';
+    tray.appendChild(label);
+    return;
+  }
+
+  waves.slice(0, 5).forEach(wave => {
+    const avatar = document.createElement('div');
+    avatar.className = 'my-wave-avatar';
+    const activityLabel = formatWaveActivityAgeLabel(wave.latestActivityAt);
+    const baseName = wave.name || 'Wave';
+    const tooltipText = activityLabel ? `${baseName} - ${activityLabel} ago` : baseName;
+    avatar.setAttribute('aria-label', tooltipText);
+    attachMemeampTooltip(avatar, tooltipText);
+
+    const avatarInner = document.createElement('div');
+    avatarInner.className = 'my-wave-avatar-inner';
+    avatar.appendChild(avatarInner);
+
+    if (wave.picture) {
+      const img = document.createElement('img');
+      img.src = wave.picture;
+      img.alt = wave.name || 'Wave';
+      avatarInner.appendChild(img);
+    } else {
+      const fallback = document.createElement('span');
+      fallback.textContent = (wave.name || '?').charAt(0).toUpperCase();
+      fallback.style.display = 'flex';
+      fallback.style.alignItems = 'center';
+      fallback.style.justifyContent = 'center';
+      fallback.style.fontSize = '11px';
+      fallback.style.color = '#ffffff';
+      avatarInner.appendChild(fallback);
+    }
+
+    if (activityLabel) {
+      const badge = document.createElement('span');
+      badge.className = 'my-wave-activity-badge';
+      badge.textContent = activityLabel;
+      avatar.appendChild(badge);
+    }
+
+    avatar.addEventListener('click', () => {
+      if (wave.url) {
+        window.open(wave.url, '_blank', 'noopener,noreferrer');
+      }
+    });
+
+    tray.appendChild(avatar);
+  });
 }
 
 type EmojiParticle = {

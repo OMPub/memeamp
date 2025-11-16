@@ -90,6 +90,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <button id="prevButton" class="nav-btn prev-btn" aria-label="Previous Meme"></button>
         <button id="addButton" class="nav-btn add-btn" aria-label="Boost Current Meme"></button>
         <button id="nextButton" class="nav-btn next-btn" aria-label="Next Meme"></button>
+
+        <div id="myWavesTray" class="my-waves-tray"></div>
         
         <!-- MY WAVES Clickable Area -->
         <button id="myWavesButton" class="my-waves-button" aria-label="Load My Waves"></button>

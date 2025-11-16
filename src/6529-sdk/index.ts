@@ -60,6 +60,45 @@ export interface RepCredit {
   rep_credit?: number;
 }
 
+export interface WaveActivity {
+  id: string;
+  name: string;
+  picture?: string | null;
+  description?: string;
+  latestActivityAt?: number | null;
+  activityCount: number;
+  url: string;
+  isDirectMessage?: boolean;
+}
+
+export interface NotificationItem {
+  id: number;
+  cause: string;
+  created_at: number;
+  read_at?: number | null;
+  related_identity?: {
+    id?: string;
+    handle?: string;
+    pfp?: string;
+  } | null;
+  additional_context?: Record<string, any> | null;
+  related_drops?: any[];
+  wave_ids?: string[];
+}
+
+export interface NotificationsResponse {
+  notifications: NotificationItem[];
+  unread_count: number;
+  category_counts: NotificationCategoryCounts;
+}
+
+export interface NotificationCategoryCounts {
+  mentionsAndReplies: number;
+  reactions: number;
+  identitySubscribed: number;
+  other: number;
+}
+
 export interface UserIdentity {
   tdh: number;
   address: string;
@@ -112,8 +151,8 @@ export interface SDKEventData {
   dataLoaded?: VotingData;
   dataError?: { error: string };
   voting?: { dropId: string; amount: number };
+  leaderboardUpdated?: { drops: any[] };
   voteSubmitted?: { dropId: string; amount: number; response: any };
-  leaderboardUpdated?: { drops: Drop[] };
   voteError?: { dropId: string; amount: number; error: string };
   repAssigning?: { identity: string; amount: number; category?: string };
   repAssigned?: { identity: string; amount: number; category?: string; response: RepAssignmentResponse };
@@ -125,7 +164,11 @@ export interface SDKEventData {
 
 export type SDKEvent = keyof SDKEventData;
 
-export type EventCallback<T extends SDKEvent = SDKEvent> = (data: SDKEventData[T]) => void;
+export type EventPayload<T extends SDKEvent> = T extends keyof SDKEventData
+  ? NonNullable<SDKEventData[T]>
+  : never;
+
+export type EventCallback<T extends SDKEvent = SDKEvent> = (data: EventPayload<T>) => void;
 
 export interface SubmissionOptions {
   page?: number;
@@ -144,7 +187,7 @@ export class SixFiveTwoNineVotingSDK {
   private accessToken: string | null = null;
   private userAddress: string | null = null;
   private callbacks: VoteSDKOptions['callbacks'];
-  private eventListeners: Map<SDKEvent, EventCallback[]>;
+  private eventListeners: Map<SDKEvent, EventCallback<any>[]>;
 
   constructor(options: VoteSDKOptions = {}) {
     this.baseURL = options.baseURL || 'https://api.6529.io';
@@ -161,7 +204,7 @@ export class SixFiveTwoNineVotingSDK {
     }
     const listeners = this.eventListeners.get(event);
     if (listeners) {
-      listeners.push(callback as EventCallback);
+      listeners.push(callback as EventCallback<any>);
     }
   }
 
@@ -169,7 +212,7 @@ export class SixFiveTwoNineVotingSDK {
     if (this.eventListeners.has(event)) {
       const listeners = this.eventListeners.get(event);
       if (listeners) {
-        const index = listeners.indexOf(callback as EventCallback);
+        const index = listeners.indexOf(callback as EventCallback<any>);
         if (index > -1) {
           listeners.splice(index, 1);
         }
@@ -177,8 +220,8 @@ export class SixFiveTwoNineVotingSDK {
     }
   }
 
-  private emit<T extends SDKEvent>(event: T, data: SDKEventData[T]): void {
-    const listeners = this.eventListeners.get(event);
+  private emit<T extends SDKEvent>(event: T, data: EventPayload<T>): void {
+    const listeners = this.eventListeners.get(event) as EventCallback<T>[] | undefined;
     if (listeners) {
       listeners.forEach(callback => {
         try {
@@ -231,7 +274,7 @@ export class SixFiveTwoNineVotingSDK {
    */
   setAccessToken(token: string): void {
     this.accessToken = token;
-    this.emit('authenticated', { token } as any);
+    this.emit('authenticated', { token });
     this.callbacks?.onAuthenticated?.(token);
   }
 
@@ -241,7 +284,7 @@ export class SixFiveTwoNineVotingSDK {
   clearAuth(): void {
     this.accessToken = null;
     this.userAddress = null;
-    this.emit('authCleared', {} as any);
+    this.emit('authCleared', {});
   }
 
   /**
@@ -379,7 +422,7 @@ export class SixFiveTwoNineVotingSDK {
       
       return token;
     } catch (error) {
-      this.emit('authenticationError', { error: (error as Error).message } as any);
+      this.emit('authenticationError', { error: (error as Error).message });
       this.callbacks?.onError?.((error as Error).message);
       throw error;
     }
@@ -719,12 +762,12 @@ export class SixFiveTwoNineVotingSDK {
         method: 'POST'
       }, { rating: amount });
 
-      this.emit('voteSubmitted', { dropId, amount, response } as any);
+      this.emit('voteSubmitted', { dropId, amount, response });
       this.callbacks?.onVoteSubmitted?.(dropId, amount);
       
       return response;
     } catch (error) {
-      this.emit('voteError', { dropId, amount, error: (error as Error).message } as any);
+      this.emit('voteError', { dropId, amount, error: (error as Error).message });
       this.callbacks?.onError?.((error as Error).message);
       throw error;
     }
@@ -748,18 +791,19 @@ export class SixFiveTwoNineVotingSDK {
 
     try {
       const trimmedCategory = category.trim();
-      this.emit('repAssigning', { identity, amount, category: trimmedCategory } as any);
+      this.emit('repAssigning', { identity, amount, category: trimmedCategory });
 
       const response = await this.authenticatedRequest(`/api/profiles/${identity}/rep/rating`, {
         method: 'POST'
       }, { amount, category: trimmedCategory });
 
-      this.emit('repAssigned', { identity, amount, category: trimmedCategory, response } as any);
+      const repResponse = response as RepAssignmentResponse;
+      this.emit('repAssigned', { identity, amount, category: trimmedCategory, response: repResponse });
       this.callbacks?.onRepAssigned?.(identity, amount, trimmedCategory);
 
-      return response as RepAssignmentResponse;
+      return repResponse;
     } catch (error) {
-      this.emit('repError', { identity, amount, category, error: (error as Error).message } as any);
+      this.emit('repError', { identity, amount, category, error: (error as Error).message });
       this.callbacks?.onError?.((error as Error).message);
       throw error;
     }
@@ -807,6 +851,129 @@ export class SixFiveTwoNineVotingSDK {
     const url = `/api/ratings/credit?${query}`;
     const response = await this.authenticatedRequest(url);
     return response as RepCredit;
+  }
+
+  /**
+   * Retrieve up to `limit` recent waves the user has joined, ranked by most recent activity
+   */
+  async getRecentWaveActivity(limit = 5): Promise<WaveActivity[]> {
+    const pageSize = 20;
+    let offset = 0;
+    const aggregatedWaves: any[] = [];
+
+    while (true) {
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String(offset),
+        type: 'RECENTLY_DROPPED_TO',
+        only_waves_followed_by_authenticated_user: 'true'
+      });
+
+      const response = await this.authenticatedRequest(`/api/waves-overview?${params.toString()}`);
+      const page = (Array.isArray(response) ? response : response?.data || []) as any[];
+      aggregatedWaves.push(...page);
+
+      if (page.length < pageSize) {
+        break;
+      }
+
+      offset += pageSize;
+    }
+
+    const joinedWaves = aggregatedWaves
+      .map((wave) => {
+        const metrics = wave.metrics || {};
+        const chatGroup = wave.chat?.scope?.group || {};
+        const toNumber = (value: any): number | null => {
+          if (value === null || value === undefined) return null;
+          if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const waveLatestDropTs = toNumber(metrics.latest_drop_timestamp);
+        const userLatestDropTs = toNumber(metrics.your_latest_drop_timestamp);
+        const createdAt = toNumber(wave.created_at);
+        const latestActivityAt = waveLatestDropTs ?? userLatestDropTs ?? createdAt ?? 0;
+
+        return {
+          id: wave.id,
+          name: wave.name,
+          picture: wave.picture,
+          description: wave.description_drop?.title || wave.description_drop?.content,
+          latestActivityAt,
+          activityCount: Number(metrics.drops_count ?? 0),
+          url: `https://6529.io/waves/${wave.id}`,
+          isDirectMessage: chatGroup?.is_direct_message || false
+        } as WaveActivity;
+      });
+
+    return joinedWaves
+      .sort((a, b) => (b.latestActivityAt ?? 0) - (a.latestActivityAt ?? 0))
+      .slice(0, limit);
+  }
+
+  /**
+   * Fetch notifications for the authenticated user
+   */
+  async getNotifications(limit = 20, beforeId?: number): Promise<NotificationsResponse> {
+    const params = new URLSearchParams({ limit: String(Math.max(1, Math.min(limit, 100))) });
+    if (beforeId) {
+      params.set('id_less_than', String(beforeId));
+    }
+
+    const response = await this.authenticatedRequest(`/api/notifications?${params.toString()}`);
+
+    const categoryCounts: NotificationCategoryCounts = {
+      mentionsAndReplies: 0,
+      reactions: 0,
+      identitySubscribed: 0,
+      other: 0
+    };
+
+    const isMentionOrReply = (cause: string) => {
+      return cause === 'IDENTITY_MENTIONED' || cause === 'DROP_REPLIED' || cause === 'DROP_QUOTED';
+    };
+
+    const isReaction = (cause: string) => {
+      return cause === 'DROP_VOTED';
+    };
+
+    const isIdentitySubscribed = (cause: string) => {
+      return cause === 'IDENTITY_SUBSCRIBED';
+    };
+
+    const notifications: NotificationItem[] = (response?.notifications || []).map((notification: any) => {
+      const waveIds = new Set<string>();
+      (notification.related_drops || []).forEach((drop: any) => {
+        const waveId = drop?.wave?.id || drop?.wave_id;
+        if (waveId) {
+          waveIds.add(waveId);
+        }
+      });
+
+      const cause = notification.cause || '';
+      if (isMentionOrReply(cause)) {
+        categoryCounts.mentionsAndReplies += 1;
+      } else if (isReaction(cause)) {
+        categoryCounts.reactions += 1;
+      } else if (isIdentitySubscribed(cause)) {
+        categoryCounts.identitySubscribed += 1;
+      } else {
+        categoryCounts.other += 1;
+      }
+
+      return {
+        ...notification,
+        wave_ids: waveIds.size > 0 ? Array.from(waveIds) : undefined
+      } as NotificationItem;
+    });
+
+    return {
+      notifications,
+      unread_count: response?.unread_count ?? 0,
+      category_counts: categoryCounts
+    } as NotificationsResponse;
   }
 
   /**
@@ -878,7 +1045,7 @@ export class SixFiveTwoNineVotingSDK {
       this.emit('dataLoaded', result);
       return result;
     } catch (error) {
-      this.emit('dataError', { error: (error as Error).message } as any);
+      this.emit('dataError', { error: (error as Error).message });
       this.callbacks?.onError?.((error as Error).message);
       throw error;
     }
@@ -930,7 +1097,7 @@ export class SixFiveTwoNineVotingSDK {
       this.emit('userDataRefreshed', result);
       return result;
     } catch (error) {
-      this.emit('userDataError', { error: (error as Error).message } as any);
+      this.emit('userDataError', { error: (error as Error).message });
       this.callbacks?.onError?.((error as Error).message);
       throw error;
     }
