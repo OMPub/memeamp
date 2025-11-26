@@ -220,9 +220,16 @@ function initSliders() {
         updateTDHFromSlider(percentage)
         const repReset = (window as any).resetRepButtonState
         if (typeof repReset === 'function') {
-          repReset()
+          // Switching to TDH: cancel any unsaved REP slider changes
+          repReset(true)
         }
       } else if (sliderId === 'slider1') {
+        const tdhReset = (window as any).resetTDHSliderState
+        if (typeof tdhReset === 'function') {
+          // Switching to REP: cancel any unsaved TDH slider changes
+          tdhReset()
+        }
+
         const repHandler = (window as any).handleRepSliderInput
         if (typeof repHandler === 'function') {
           repHandler(percentage)
@@ -247,9 +254,16 @@ function initSliders() {
         updateTDHFromSlider(percentage)
         const repReset = (window as any).resetRepButtonState
         if (typeof repReset === 'function') {
-          repReset()
+          // Switching to TDH: cancel any unsaved REP slider changes
+          repReset(true)
         }
       } else if (sliderId === 'slider1') {
+        const tdhReset = (window as any).resetTDHSliderState
+        if (typeof tdhReset === 'function') {
+          // Switching to REP: cancel any unsaved TDH slider changes
+          tdhReset()
+        }
+
         const repHandler = (window as any).handleRepSliderInput
         if (typeof repHandler === 'function') {
           repHandler(percentage)
@@ -283,7 +297,12 @@ function updateTDHFromSlider(percentage: number): void {
   
   // Calculate new TDH assignment based on slider position
   const rawAssignment = Math.round((percentage / 100) * maxTDH)
-  const newAssignment = normalizeTDHToPattern(rawAssignment, maxTDH)
+  let newAssignment = normalizeTDHToPattern(rawAssignment, maxTDH)
+
+  // Once a user has voted (>0 TDH on this meme), keep the minimum at 1
+  if (currentAssignment > 0 && maxTDH > 0 && newAssignment < 1) {
+    newAssignment = 1
+  }
   
   // Format TDH amount for display (compact) and tooltip (full number)
   const formattedTDH = formatCompactTDH(newAssignment)

@@ -1306,10 +1306,14 @@ async function submitVote(): Promise<void> {
   }
 
   const submission = currentSubmissions[currentSubmissionIndex];
-  const voteAmount = (window as any).pendingTDHAssignment || 0;
+  const voteAmountRaw = (window as any).pendingTDHAssignment;
+  const voteAmount = typeof voteAmountRaw === 'number' && Number.isFinite(voteAmountRaw)
+    ? Math.round(voteAmountRaw)
+    : 0;
 
   if (voteAmount <= 0) {
-    showError('Please adjust the TDH slider to assign TDH before voting.');
+    resetTDHSliderState();
+    showError('TDH votes must be greater than 0. Clearing a vote to 0 is not supported by the 6529 API from this app.');
     return;
   }
 
@@ -1337,12 +1341,11 @@ async function submitVote(): Promise<void> {
       mergeRefreshedUserData(refreshed);
     }
 
-    // Update TDH display with the new assignment
-    const identityTdh = document.getElementById('identityTdh');
-    if (identityTdh) {
-      const formattedTDH = formatCompactTDH(voteAmount);
-      identityTdh.textContent = formattedTDH;
-    }
+    const updatedTDH = refreshed.userVotesMap?.[submission.id] ?? voteAmount;
+    const availableTDH = refreshed.user?.availableTDH ?? 0;
+
+    updateIdentityInfoDisplay(updatedTDH, availableTDH);
+    updateTDHSlider(updatedTDH, availableTDH);
 
     updateBoostTooltip();
     hideError();
@@ -1372,12 +1375,11 @@ async function submitVote(): Promise<void> {
           mergeRefreshedUserData(refreshed);
         }
 
-        // Update TDH display with the new assignment
-        const identityTdh = document.getElementById('identityTdh');
-        if (identityTdh) {
-          const formattedTDH = formatCompactTDH(voteAmount);
-          identityTdh.textContent = formattedTDH;
-        }
+        const updatedTDH = refreshed.userVotesMap?.[submission.id] ?? voteAmount;
+        const availableTDH = refreshed.user?.availableTDH ?? 0;
+
+        updateIdentityInfoDisplay(updatedTDH, availableTDH);
+        updateTDHSlider(updatedTDH, availableTDH);
 
         updateBoostTooltip();
         hideError();
@@ -1692,6 +1694,12 @@ function updateTDHSlider(assignedTDH: number, availableTDH: number): void {
   (window as any).pendingTDHAssignment = assignedTDH;
 }
 
+function resetTDHSliderState(): void {
+  const assignedTDH = (window as any).currentAssignedTDH || 0;
+  const availableTDH = votingData?.user?.availableTDH ?? 0;
+  updateTDHSlider(assignedTDH, availableTDH);
+}
+
 function showRepLoading(message: string = '..'): void {
   setMemeLoading('identityRep', message);
 }
@@ -1801,6 +1809,7 @@ function updateRepButtonState(): void {
   (window as any).handleRepSliderInput = handleRepSliderInput;
   (window as any).resetRepButtonState = resetRepButtonState;
   (window as any).formatRepTooltip = formatRepTooltip;
+  (window as any).resetTDHSliderState = resetTDHSliderState;
 })();
 
 function formatRepTooltip(amount: number): string {
@@ -1884,7 +1893,17 @@ function resetRepButtonState(resetPending: boolean = true): void {
     pendingRepAssignment = currentRepAssignment;
     (window as any).pendingRepAssignment = pendingRepAssignment;
     updateRepButtonState();
-    updateIdentityInfoDisplay((window as any).currentAssignedTDH || 0, currentRepAssignment);
+    const repSlider = document.getElementById('slider1') as HTMLElement | null;
+    if (repSlider && repSliderMax > 0) {
+      const positionPercentage = repSliderMax > 0 ? (currentRepAssignment / repSliderMax) * 100 : 0;
+      repSlider.style.left = `${positionPercentage}%`;
+      updateMemeampTooltip(repSlider, formatRepTooltip(currentRepAssignment));
+    }
+
+    const repElement = document.getElementById('identityRep');
+    if (repElement) {
+      repElement.textContent = formatRepDisplay(currentRepTotalAssigned);
+    }
   }
 }
 
