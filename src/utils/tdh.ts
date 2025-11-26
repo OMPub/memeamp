@@ -27,7 +27,7 @@ export function normalizeTDHToPattern(requested: number, max: number): number {
   if (maxInt === 0) return 0;
   if (reqInt > maxInt) reqInt = maxInt;
 
-  if (reqInt < 10000 || maxInt < 10000) {
+  if (reqInt < 1000 || maxInt < 1000) {
     return reqInt;
   }
 
@@ -39,7 +39,7 @@ export function normalizeTDHToPattern(requested: number, max: number): number {
   if (down > reqInt) {
     down = (base - 1) * blockSize + suffix;
   }
-  if (down < 10000 || down > maxInt) {
+  if (down < 1000 || down > maxInt) {
     down = NaN as any;
   }
 
@@ -48,7 +48,7 @@ export function normalizeTDHToPattern(requested: number, max: number): number {
     upBase = base + 1;
   }
   let up = upBase * blockSize + suffix;
-  if (up < 10000 || up > maxInt) {
+  if (up < 1000 || up > maxInt) {
     up = NaN as any;
   }
 

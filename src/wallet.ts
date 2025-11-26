@@ -1765,17 +1765,18 @@ function handleRepSliderInput(percentage: number): void {
   if (repSliderMax <= 0) return;
 
   const repSlider = document.getElementById('slider1') as HTMLElement | null;
-  const unclamped = Math.round((percentage / 100) * repSliderMax);
-  const newAssignment = clampSliderValue(unclamped);
+  const rawValue = Math.round((percentage / 100) * repSliderMax);
+  const clampedValue = clampSliderValue(rawValue);
+  const snappedValue = normalizeRepToPattern(clampedValue);
 
-  pendingRepAssignment = newAssignment;
-  (window as any).pendingRepAssignment = newAssignment;
+  pendingRepAssignment = snappedValue;
+  (window as any).pendingRepAssignment = snappedValue;
 
   if (repSlider) {
-    updateMemeampTooltip(repSlider, formatRepTooltip(newAssignment));
+    updateMemeampTooltip(repSlider, formatRepTooltip(snappedValue));
   }
 
-  updateIdentityInfoDisplay((window as any).currentAssignedTDH || 0, newAssignment);
+  updateIdentityInfoDisplay((window as any).currentAssignedTDH || 0, snappedValue);
   updateRepButtonState();
 }
 
@@ -1824,6 +1825,51 @@ function clampSliderValue(value: number): number {
   if (rounded < 0) return 0;
   if (rounded > repSliderMax) return repSliderMax;
   return rounded;
+}
+
+function normalizeRepToPattern(value: number): number {
+  const max = repSliderMax;
+  if (max <= 0) return 0;
+
+  const clamped = clampSliderValue(value);
+  const PATTERN_SUFFIX = 67;
+  const PATTERN_BLOCK = 100;
+  const MIN_PATTERN_VALUE = 1000;
+
+  if (clamped >= max - 2) {
+    return max;
+  }
+
+  if (clamped < MIN_PATTERN_VALUE || max < MIN_PATTERN_VALUE) {
+    return clamped;
+  }
+
+  const base = Math.floor(clamped / PATTERN_BLOCK);
+
+  let down = base * PATTERN_BLOCK + PATTERN_SUFFIX;
+  if (down > clamped) {
+    down = (base - 1) * PATTERN_BLOCK + PATTERN_SUFFIX;
+  }
+  if (down < MIN_PATTERN_VALUE || down > max) {
+    down = Number.NaN;
+  }
+
+  let upBase = base;
+  if (!Number.isNaN(down) && down < clamped) {
+    upBase = base + 1;
+  }
+  let up = upBase * PATTERN_BLOCK + PATTERN_SUFFIX;
+  if (up < MIN_PATTERN_VALUE || up > max) {
+    up = Number.NaN;
+  }
+
+  if (Number.isNaN(down) && Number.isNaN(up)) {
+    return clamped;
+  }
+  if (Number.isNaN(down)) return up;
+  if (Number.isNaN(up)) return down;
+
+  return Math.abs(up - clamped) < Math.abs(clamped - down) ? up : down;
 }
 
 function resetRepButtonState(resetPending: boolean = true): void {
